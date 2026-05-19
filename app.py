@@ -531,64 +531,147 @@ def main():
         if error:
             st.warning(error)
         else:
-            col1, col2, col3 = st.columns([1.2, 1, 1.5])
+            # =========================
+            # ROW 1: GAMBAR + PREDIKSI
+            # =========================
+            left_col, right_col = st.columns([1.15, 1.85], gap="large")
 
-            with col1:
-                st.markdown("**Frame + Landmark**")
+            with left_col:
+                st.markdown("### Frame + Landmark")
                 st.image(result["vis_frame"], width="stretch")
 
-            with col2:
-                st.markdown("**Prediksi MST**")
+            with right_col:
+                st.markdown("### Prediksi MST")
 
                 skin_hex = cielab_to_hex(
                     result["cielab"]["L"],
                     result["cielab"]["a"],
                     result["cielab"]["b"]
                 )
-                st.markdown(
-                    f'<div style="background:{skin_hex};border-radius:10px;'
-                    f'height:50px;margin-bottom:6px;border:1px solid #ccc"></div>'
-                    f'<p style="text-align:center;font-size:12px;margin-top:0">Warna Kulit Terdeteksi<br>{skin_hex}</p>',
-                    unsafe_allow_html=True
-                )
-                st.markdown(
-                    f'<div style="background:{result["hex_color"]};border-radius:10px;'
-                    f'height:50px;margin-bottom:6px;border:1px solid #ccc"></div>'
-                    f'<p style="text-align:center;font-size:12px;margin-top:0">Foundation Cocok<br>{result["hex_color"]}</p>',
-                    unsafe_allow_html=True
-                )
-                st.markdown(
-                    f'<div style="text-align:center;background:#f0f0f0;'
-                    f'border-radius:12px;padding:12px;margin:8px 0">'
-                    f'<span style="font-size:36px;font-weight:bold">MST {result["mst_pred"]}</span><br>'
-                    f'<span style="font-size:14px;color:#666">Confidence: {result["confidence"]}%</span>'
-                    f'</div>',
-                    unsafe_allow_html=True
-                )
 
-                conf_pct  = result["confidence"]
-                bar_color = "#2e8b57" if conf_pct >= 60 else "#e07b39" if conf_pct >= 40 else "#cc2222"
-                st.markdown(
-                    f'<div style="background:#eee;border-radius:6px;height:12px;overflow:hidden">'
-                    f'<div style="background:{bar_color};width:{conf_pct}%;height:100%;border-radius:6px"></div>'
-                    f'</div>',
-                    unsafe_allow_html=True
-                )
+                pred_left, pred_right = st.columns([1, 1], gap="medium")
 
-                st.markdown("**Top-3 Alternatif MST:**")
-                for t in result["top3"]:
-                    hex_c = t["hex"]
+                with pred_left:
+                    st.markdown("**Warna Kulit Terdeteksi**")
                     st.markdown(
-                        f'<div style="display:flex;align-items:center;gap:8px;margin:4px 0">'
-                        f'<div style="background:{hex_c};width:28px;height:28px;border-radius:5px;'
-                        f'flex-shrink:0;border:1px solid #ccc"></div>'
-                        f'<span style="font-size:13px">MST {t["mst"]} — {t["conf"]}%</span>'
-                        f'</div>',
+                        f"""
+                        <div style="
+                            background:{skin_hex};
+                            border-radius:14px;
+                            height:70px;
+                            border:1px solid #ddd;
+                            margin-bottom:8px;">
+                        </div>
+                        <p style="text-align:center;font-size:13px;margin-top:0;">
+                            {skin_hex}
+                        </p>
+                        """,
                         unsafe_allow_html=True
                     )
 
-            with col3:
-                st.markdown("**Rekomendasi Foundation**")
+                    st.markdown("**Foundation Cocok**")
+                    st.markdown(
+                        f"""
+                        <div style="
+                            background:{result["hex_color"]};
+                            border-radius:14px;
+                            height:70px;
+                            border:1px solid #ddd;
+                            margin-bottom:8px;">
+                        </div>
+                        <p style="text-align:center;font-size:13px;margin-top:0;">
+                            {result["hex_color"]}
+                        </p>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                with pred_right:
+                    st.markdown(
+                        f"""
+                        <div style="
+                            background:#f5f5f5;
+                            border-radius:18px;
+                            padding:24px 18px;
+                            text-align:center;
+                            border:1px solid #e5e5e5;
+                            margin-bottom:12px;">
+                            <div style="font-size:42px;font-weight:800;margin-bottom:6px;">
+                                MST {result["mst_pred"]}
+                            </div>
+                            <div style="font-size:15px;color:#555;">
+                                Confidence: {result["confidence"]}%
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                    conf_pct = result["confidence"]
+                    bar_color = "#2e8b57" if conf_pct >= 60 else "#e07b39" if conf_pct >= 40 else "#cc2222"
+
+                    st.markdown(
+                        f"""
+                        <div style="
+                            background:#eeeeee;
+                            border-radius:999px;
+                            height:12px;
+                            overflow:hidden;
+                            margin-bottom:14px;">
+                            <div style="
+                                background:{bar_color};
+                                width:{conf_pct}%;
+                                height:100%;
+                                border-radius:999px;">
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                    st.markdown("**Top-3 Alternatif MST**")
+                    for t in result["top3"]:
+                        hex_c = t["hex"]
+                        st.markdown(
+                            f"""
+                            <div style="
+                                display:flex;
+                                align-items:center;
+                                gap:10px;
+                                margin:7px 0;">
+                                <div style="
+                                    background:{hex_c};
+                                    width:34px;
+                                    height:34px;
+                                    border-radius:8px;
+                                    border:1px solid #ccc;">
+                                </div>
+                                <span style="font-size:14px;">
+                                    MST {t["mst"]} — {t["conf"]}%
+                                </span>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+
+                st.markdown("---")
+
+                st.markdown("### Nilai CIELAB Kulit")
+                c1, c2, c3 = st.columns(3)
+                c1.metric("L* (kecerahan)", result["cielab"]["L"])
+                c2.metric("a* (merah-hijau)", result["cielab"]["a"])
+                c3.metric("b* (kuning-biru)", result["cielab"]["b"])
+
+            st.markdown("---")
+
+            # ==========================================
+            # ROW 2: REKOMENDASI UTAMA + TOP 5 PRODUK
+            # ==========================================
+            rec_col, top5_col = st.columns([1.1, 1.6], gap="large")
+
+            with rec_col:
+                st.markdown("### Rekomendasi Foundation")
+
                 st.markdown(f"""
                 | Info | Detail |
                 |------|--------|
@@ -599,18 +682,20 @@ def main():
                 | 💰 Price | {result['price']} |
                 """)
 
-                st.markdown("**Nilai CIELAB Kulit:**")
-                c1, c2, c3 = st.columns(3)
-                c1.metric("L* (kecerahan)", result["cielab"]["L"])
-                c2.metric("a* (merah-hijau)", result["cielab"]["a"])
-                c3.metric("b* (kuning-biru)", result["cielab"]["b"])
+            with top5_col:
+                st.markdown("### Top-5 Rekomendasi Foundation")
 
-                st.markdown("**Top-5 Rekomendasi Foundation:**")
                 df_recs = pd.DataFrame(result["top5_recs"])[
                     ["Brand", "Product", "Shade", "Undertone", "Price"]
                 ]
+
                 df_recs["Price"] = df_recs["Price"].apply(format_rupiah)
-                st.dataframe(df_recs, width="stretch", hide_index=True)
+
+                st.dataframe(
+                    df_recs,
+                    width="stretch",
+                    hide_index=True
+                )
 
             st.caption(f"⏱️ Waktu analisis: {result['latency_ms']} ms")
 
