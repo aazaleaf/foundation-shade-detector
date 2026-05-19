@@ -578,7 +578,8 @@ def main():
     st.markdown(
     """
     <style>
-    [data-testid="stCameraInput"] video {
+    [data-testid="stCameraInput"] video,
+    [data-testid="stCameraInput"] img {
         transform: scaleX(-1);
     }
     </style>
