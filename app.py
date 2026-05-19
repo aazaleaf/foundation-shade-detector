@@ -20,6 +20,7 @@ from sklearn.preprocessing import StandardScaler
 import pandas as pd
 from PIL import ImageDraw, ImageFont
 import tempfile
+from datetime import datetime
 
 # ─────────────────────────────────────────────
 # MEDIAPIPE — mapping dari dlib 68-point ke Face Mesh
