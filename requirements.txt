@@ -1,5 +1,6 @@
 streamlit
 numpy
+pandas
 opencv-python-headless
 mediapipe
 joblib
@@ -7,4 +8,3 @@ Pillow
 scipy
 scikit-image
 scikit-learn
-pandas
