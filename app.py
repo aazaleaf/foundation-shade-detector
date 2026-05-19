@@ -549,47 +549,53 @@ def main():
                     result["cielab"]["b"]
                 )
 
-                pred_left, pred_right = st.columns([1.08, 1], gap="medium")
+                pred_left, pred_right = st.columns([1.12, 1], gap="medium")
 
+                # =========================
+                # KIRI: WARNA KULIT + FOUNDATION
+                # =========================
                 with pred_left:
                     st.markdown(
                         f"""
-                        <div style="font-size:14px;font-weight:700;margin-bottom:6px;">
+                        <div style="font-size:13px;font-weight:700;margin-bottom:4px;">
                             Warna Kulit Terdeteksi
                         </div>
                         <div style="
                             background:{skin_hex};
-                            border-radius:10px;
-                            height:38px;
+                            border-radius:8px;
+                            height:30px;
                             border:1px solid #ddd;">
                         </div>
                         <div style="
                             text-align:center;
-                            font-size:11px;
-                            margin-top:4px;
-                            margin-bottom:12px;">
+                            font-size:10px;
+                            margin-top:2px;
+                            margin-bottom:10px;">
                             {skin_hex}
                         </div>
 
-                        <div style="font-size:14px;font-weight:700;margin-bottom:6px;">
+                        <div style="font-size:13px;font-weight:700;margin-bottom:4px;">
                             Foundation Cocok
                         </div>
                         <div style="
                             background:{result["hex_color"]};
-                            border-radius:10px;
-                            height:38px;
+                            border-radius:8px;
+                            height:30px;
                             border:1px solid #ddd;">
                         </div>
                         <div style="
                             text-align:center;
-                            font-size:11px;
-                            margin-top:4px;">
+                            font-size:10px;
+                            margin-top:2px;">
                             {result["hex_color"]}
                         </div>
                         """,
                         unsafe_allow_html=True
                     )
 
+                # =========================
+                # KANAN: MST + TOP 3
+                # =========================
                 with pred_right:
                     conf_pct = result["confidence"]
                     bar_color = "#2e8b57" if conf_pct >= 60 else "#e07b39" if conf_pct >= 40 else "#cc2222"
@@ -598,21 +604,21 @@ def main():
                         f"""
                         <div style="
                             background:#f7f7f7;
-                            border-radius:14px;
-                            padding:14px 12px;
+                            border-radius:12px;
+                            padding:10px 10px;
                             text-align:center;
                             border:1px solid #e0e0e0;
-                            margin-bottom:8px;">
+                            margin-bottom:6px;">
                             <div style="
-                                font-size:28px;
+                                font-size:24px;
                                 font-weight:800;
                                 line-height:1;">
                                 MST {result["mst_pred"]}
                             </div>
                             <div style="
-                                font-size:12px;
+                                font-size:11px;
                                 color:#555;
-                                margin-top:7px;">
+                                margin-top:5px;">
                                 Confidence: {result["confidence"]}%
                             </div>
                         </div>
@@ -620,9 +626,9 @@ def main():
                         <div style="
                             background:#eeeeee;
                             border-radius:999px;
-                            height:8px;
+                            height:6px;
                             overflow:hidden;
-                            margin-bottom:10px;">
+                            margin-bottom:8px;">
                             <div style="
                                 background:{bar_color};
                                 width:{conf_pct}%;
@@ -632,9 +638,9 @@ def main():
                         </div>
 
                         <div style="
-                            font-size:14px;
+                            font-size:13px;
                             font-weight:700;
-                            margin-bottom:6px;">
+                            margin-bottom:4px;">
                             Top-3 Alternatif MST
                         </div>
                         """,
@@ -648,17 +654,17 @@ def main():
                             <div style="
                                 display:flex;
                                 align-items:center;
-                                gap:8px;
-                                margin:4px 0;">
+                                gap:7px;
+                                margin:3px 0;">
                                 <div style="
                                     background:{hex_c};
-                                    width:24px;
-                                    height:24px;
-                                    border-radius:6px;
+                                    width:20px;
+                                    height:20px;
+                                    border-radius:5px;
                                     border:1px solid #ccc;
                                     flex-shrink:0;">
                                 </div>
-                                <span style="font-size:12px;">
+                                <span style="font-size:11px;">
                                     MST {t["mst"]} — {t["conf"]}%
                                 </span>
                             </div>
@@ -666,33 +672,42 @@ def main():
                             unsafe_allow_html=True
                         )
 
+                # =========================
+                # CIELAB COMPACT
+                # =========================
                 st.markdown(
                     f"""
                     <div style="
-                        margin-top:16px;
-                        padding-top:12px;
+                        margin-top:12px;
+                        padding-top:10px;
                         border-top:1px solid #e2e2e2;">
                         <div style="
-                            font-size:20px;
+                            font-size:17px;
                             font-weight:800;
-                            margin-bottom:10px;">
+                            margin-bottom:8px;">
                             Nilai CIELAB Kulit
                         </div>
                         <div style="
                             display:grid;
                             grid-template-columns:repeat(3, 1fr);
-                            gap:14px;">
+                            gap:10px;">
                             <div>
-                                <div style="font-size:12px;color:#444;">L* (kecerahan)</div>
-                                <div style="font-size:26px;font-weight:500;">{result["cielab"]["L"]}</div>
+                                <div style="font-size:11px;color:#444;">L* (kecerahan)</div>
+                                <div style="font-size:22px;font-weight:500;line-height:1.1;">
+                                    {result["cielab"]["L"]}
+                                </div>
                             </div>
                             <div>
-                                <div style="font-size:12px;color:#444;">a* (merah-hijau)</div>
-                                <div style="font-size:26px;font-weight:500;">{result["cielab"]["a"]}</div>
+                                <div style="font-size:11px;color:#444;">a* (merah-hijau)</div>
+                                <div style="font-size:22px;font-weight:500;line-height:1.1;">
+                                    {result["cielab"]["a"]}
+                                </div>
                             </div>
                             <div>
-                                <div style="font-size:12px;color:#444;">b* (kuning-biru)</div>
-                                <div style="font-size:26px;font-weight:500;">{result["cielab"]["b"]}</div>
+                                <div style="font-size:11px;color:#444;">b* (kuning-biru)</div>
+                                <div style="font-size:22px;font-weight:500;line-height:1.1;">
+                                    {result["cielab"]["b"]}
+                                </div>
                             </div>
                         </div>
                     </div>
