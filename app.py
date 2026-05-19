@@ -18,6 +18,8 @@ from skimage.color import rgb2lab
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 import pandas as pd
+from PIL import ImageDraw, ImageFont
+import tempfile
 
 # ─────────────────────────────────────────────
 # MEDIAPIPE — mapping dari dlib 68-point ke Face Mesh
@@ -417,6 +419,12 @@ def run_pipeline(img_rgb, face_mesh, ensemble, scaler,
     for (px, py) in lms.values():
         cv2.circle(vis, (int(px), int(py)), 1, (255, 100, 0), -1)
 
+    skin_hex = cielab_to_hex(
+    feats["global_L_mean"],
+    feats["global_a_mean"],
+    feats["global_b_mean"]
+    )
+    
     return {
         "mst_pred"  : mst,
         "confidence": conf,
@@ -425,6 +433,7 @@ def run_pipeline(img_rgb, face_mesh, ensemble, scaler,
         "brand"     : top_rec["Brand"],
         "product"   : top_rec["Product"],
         "hex_color" : top_rec["mst_hex"],
+        "skin_hex"  : skin_hex,
         "undertone" : top_rec["Undertone"],
         "price"     : format_rupiah(top_rec["Price"]),
         "top5_recs" : recs.to_dict(orient="records"),
@@ -437,6 +446,108 @@ def run_pipeline(img_rgb, face_mesh, ensemble, scaler,
         "vis_frame" : vis,
     }, None
 
+def create_analysis_report(result):
+    # Canvas report
+    W, H = 1400, 1000
+    bg = (255, 255, 255)
+    img = Image.new("RGB", (W, H), bg)
+    draw = ImageDraw.Draw(img)
+
+    # Font fallback
+    try:
+        font_title = ImageFont.truetype("arial.ttf", 42)
+        font_h2 = ImageFont.truetype("arial.ttf", 30)
+        font_text = ImageFont.truetype("arial.ttf", 24)
+        font_small = ImageFont.truetype("arial.ttf", 20)
+        font_big = ImageFont.truetype("arial.ttf", 58)
+    except:
+        font_title = ImageFont.load_default()
+        font_h2 = ImageFont.load_default()
+        font_text = ImageFont.load_default()
+        font_small = ImageFont.load_default()
+        font_big = ImageFont.load_default()
+
+    # Title
+    draw.text((50, 35), "Foundation Shade Detector - Hasil Analisis", fill=(30, 30, 30), font=font_title)
+
+    # Frame landmark
+    frame = Image.fromarray(result["vis_frame"]).convert("RGB")
+    frame.thumbnail((520, 380))
+    draw.text((50, 115), "Frame + Landmark", fill=(30, 30, 30), font=font_h2)
+    img.paste(frame, (50, 165))
+
+    # Prediksi MST
+    x = 630
+    y = 115
+    draw.text((x, y), "Prediksi MST", fill=(30, 30, 30), font=font_h2)
+
+    # Color boxes
+    skin_hex = result.get("skin_hex", "")
+    detected_hex = skin_hex if skin_hex else "-"
+    foundation_hex = result["hex_color"]
+
+    draw.text((x, y + 60), "Warna Kulit Terdeteksi", fill=(40, 40, 40), font=font_text)
+    draw.rounded_rectangle((x, y + 100, x + 260, y + 150), radius=12, fill=detected_hex if detected_hex != "-" else "#cccccc", outline=(200, 200, 200))
+    draw.text((x + 285, y + 112), detected_hex, fill=(40, 40, 40), font=font_text)
+
+    draw.text((x, y + 180), "Foundation Cocok", fill=(40, 40, 40), font=font_text)
+    draw.rounded_rectangle((x, y + 220, x + 260, y + 270), radius=12, fill=foundation_hex, outline=(200, 200, 200))
+    draw.text((x + 285, y + 232), foundation_hex, fill=(40, 40, 40), font=font_text)
+
+    # MST card
+    card_x = 1050
+    card_y = 175
+    draw.rounded_rectangle((card_x, card_y, card_x + 280, card_y + 150), radius=20, fill=(245, 245, 245), outline=(220, 220, 220))
+    draw.text((card_x + 55, card_y + 35), f"MST {result['mst_pred']}", fill=(25, 25, 25), font=font_big)
+    draw.text((card_x + 55, card_y + 105), f"Confidence: {result['confidence']}%", fill=(80, 80, 80), font=font_small)
+
+    # Top 3
+    draw.text((1050, 360), "Top-3 Alternatif MST", fill=(40, 40, 40), font=font_text)
+    yy = 405
+    for t in result["top3"]:
+        draw.rounded_rectangle((1050, yy, 1085, yy + 35), radius=6, fill=t["hex"], outline=(180, 180, 180))
+        draw.text((1100, yy + 3), f"MST {t['mst']} - {t['conf']}%", fill=(40, 40, 40), font=font_small)
+        yy += 48
+
+    # CIELAB
+    draw.text((630, 470), "Nilai CIELAB Kulit", fill=(30, 30, 30), font=font_h2)
+    draw.text((630, 525), f"L*  : {result['cielab']['L']}", fill=(40, 40, 40), font=font_text)
+    draw.text((830, 525), f"a*  : {result['cielab']['a']}", fill=(40, 40, 40), font=font_text)
+    draw.text((1030, 525), f"b*  : {result['cielab']['b']}", fill=(40, 40, 40), font=font_text)
+
+    # Rekomendasi utama
+    y2 = 620
+    draw.line((50, y2 - 30, 1350, y2 - 30), fill=(220, 220, 220), width=2)
+    draw.text((50, y2), "Rekomendasi Foundation", fill=(30, 30, 30), font=font_h2)
+
+    rec_lines = [
+        f"Brand      : {result['brand']}",
+        f"Produk     : {result['product']}",
+        f"Shade      : {result['shade_name']}",
+        f"Undertone  : {result['undertone']}",
+        f"Price      : {result['price']}",
+    ]
+
+    yy = y2 + 55
+    for line in rec_lines:
+        draw.text((50, yy), line, fill=(40, 40, 40), font=font_text)
+        yy += 38
+
+    # Top 5
+    draw.text((700, y2), "Top-5 Rekomendasi Foundation", fill=(30, 30, 30), font=font_h2)
+    yy = y2 + 55
+
+    for i, rec in enumerate(result["top5_recs"][:5], start=1):
+        brand = str(rec.get("Brand", "-"))
+        shade = str(rec.get("Shade", "-"))
+        undertone = str(rec.get("Undertone", "-"))
+        price = format_rupiah(rec.get("Price", "-"))
+
+        line = f"{i}. {brand} | {shade} | {undertone} | {price}"
+        draw.text((700, yy), line[:55], fill=(40, 40, 40), font=font_small)
+        yy += 40
+
+    return img
 
 # ─────────────────────────────────────────────
 # STREAMLIT UI
@@ -520,6 +631,9 @@ def main():
         img_bgr    = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
         img_rgb    = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
 
+        if input_mode == "Kamera":
+            img_rgb = cv2.flip(img_rgb, 1)
+
         st.subheader("🔍 Hasil Analisis")
 
         with st.spinner("Menganalisis wajah..."):
@@ -557,7 +671,7 @@ def main():
             with pred_left:
                 st.markdown(
                     f"""
-                    <div style="font-size:15px;font-weight:700;margin-bottom:6px;">
+                    <div style="font-size:17px;font-weight:700;margin-bottom:6px;">
                         Warna Kulit Terdeteksi
                     </div>
 
@@ -574,14 +688,14 @@ def main():
                             border:1px solid #ddd;">
                         </div>
                         <div style="
-                            font-size:15px;
-                            font-weight:600;
+                            font-size:17px;
+                            font-weight:700;
                             color:#333;">
                             {skin_hex}
                         </div>
                     </div>
 
-                    <div style="font-size:15px;font-weight:700;margin-bottom:6px;">
+                    <div style="font-size:17px;font-weight:700;margin-bottom:6px;">
                         Foundation Cocok
                     </div>
 
@@ -592,13 +706,13 @@ def main():
                         <div style="
                             background:{result["hex_color"]};
                             border-radius:8px;
-                            height:38px;
+                            height:44px;
                             width:58%;
                             border:1px solid #ddd;">
                         </div>
                         <div style="
-                            font-size:15px;
-                            font-weight:600;
+                            font-size:17px;
+                            font-weight:700;
                             color:#333;">
                             {result["hex_color"]}
                         </div>
@@ -619,18 +733,18 @@ def main():
                         <div style="
                             background:#f7f7f7;
                             border-radius:12px;
-                            padding:10px 10px;
+                            padding:15px 12px;
                             text-align:center;
                             border:1px solid #e0e0e0;
                             margin-bottom:6px;">
                             <div style="
-                                font-size:32px;
+                                font-size:38px;
                                 font-weight:800;
                                 line-height:1;">
                                 MST {result["mst_pred"]}
                             </div>
                             <div style="
-                                font-size:13px;
+                                font-size:17px;
                                 color:#555;
                                 margin-top:5px;">
                                 Confidence: {result["confidence"]}%
@@ -672,13 +786,13 @@ def main():
                                 margin:3px 0;">
                                 <div style="
                                     background:{hex_c};
-                                    width:26px;
-                                    height:26px;
+                                    width:30px;
+                                    height:30px;
                                     border-radius:5px;
                                     border:1px solid #ccc;
                                     flex-shrink:0;">
                                 </div>
-                                <span style="font-size:13px;">
+                                <span style="font-size:17px;">
                                     MST {t["mst"]} — {t["conf"]}%
                                 </span>
                             </div>
@@ -696,7 +810,7 @@ def main():
                         padding-top:10px;
                         border-top:1px solid #e2e2e2;">
                         <div style="
-                            font-size:20px;
+                            font-size:23px;
                             font-weight:800;
                             margin-bottom:8px;">
                             Nilai CIELAB Kulit
@@ -706,19 +820,19 @@ def main():
                             grid-template-columns:repeat(3, 1fr);
                             gap:10px;">
                             <div>
-                                <div style="font-size:13px;color:#444;">L* (kecerahan)</div>
+                                <div style="font-size:15px;color:#444;">L* (kecerahan)</div>
                                 <div style="font-size:24px;font-weight:500;line-height:1.1;">
                                     {result["cielab"]["L"]}
                                 </div>
                             </div>
                             <div>
-                                <div style="font-size:13px;color:#444;">a* (merah-hijau)</div>
+                                <div style="font-size:15px;color:#444;">a* (merah-hijau)</div>
                                 <div style="font-size:24px;font-weight:500;line-height:1.1;">
                                     {result["cielab"]["a"]}
                                 </div>
                             </div>
                             <div>
-                                <div style="font-size:13px;color:#444;">b* (kuning-biru)</div>
+                                <div style="font-size:15px;color:#444;">b* (kuning-biru)</div>
                                 <div style="font-size:24px;font-weight:500;line-height:1.1;">
                                     {result["cielab"]["b"]}
                                 </div>
@@ -762,6 +876,20 @@ def main():
                     df_recs,
                     width="stretch",
                     hide_index=True
+                )
+
+                report_img = create_analysis_report(result)
+
+                buffer = BytesIO()
+                report_img.save(buffer, format="PNG")
+                buffer.seek(0)
+
+                st.download_button(
+                    label="📥 Download Hasil Analisis",
+                    data=buffer,
+                    file_name="hasil_analisis_foundation.png",
+                    mime="image/png",
+                    use_container_width=True
                 )
 
             st.caption(f"⏱️ Waktu analisis: {result['latency_ms']} ms")
