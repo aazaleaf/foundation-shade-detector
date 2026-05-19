@@ -446,6 +446,19 @@ def run_pipeline(img_rgb, face_mesh, ensemble, scaler,
         "latency_ms": latency,
         "vis_frame" : vis,
     }, None
+def load_font(size, bold=False):
+    paths = [
+        "arialbd.ttf" if bold else "arial.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]
+
+    for p in paths:
+        try:
+            return ImageFont.truetype(p, size)
+        except:
+            continue
+
+    return ImageFont.load_default()
 
 def create_analysis_report(result):
     # Canvas report
@@ -456,11 +469,13 @@ def create_analysis_report(result):
 
     # Font fallback
     try:
-        font_title = ImageFont.truetype("arial.ttf", 42)
-        font_h2 = ImageFont.truetype("arial.ttf", 30)
-        font_text = ImageFont.truetype("arial.ttf", 24)
-        font_small = ImageFont.truetype("arial.ttf", 20)
-        font_big = ImageFont.truetype("arial.ttf", 58)
+        font_title = load_font(42, bold=True)
+        font_h1 = load_font(34, bold=True)
+        font_h2 = load_font(28, bold=True)
+        font_text = load_font(24)
+        font_small = load_font(21)
+        font_table = load_font(20)
+        font_big = load_font(54, bold=True)
     except:
         font_title = ImageFont.load_default()
         font_h2 = ImageFont.load_default()
@@ -558,6 +573,17 @@ def main():
         page_title="Foundation Shade Detector",
         page_icon="🎨",
         layout="wide",
+    )
+
+    st.markdown(
+    """
+    <style>
+    [data-testid="stCameraInput"] video {
+        transform: scaleX(-1);
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
     )
 
     st.title("🎨 Foundation Shade Detector")
