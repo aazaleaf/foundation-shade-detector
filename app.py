@@ -554,44 +554,58 @@ def main():
                 # =========================
                 # KIRI: WARNA KULIT + FOUNDATION
                 # =========================
-                with pred_left:
-                    st.markdown(
-                        f"""
-                        <div style="font-size:15px;font-weight:700;margin-bottom:4px;">
-                            Warna Kulit Terdeteksi
-                        </div>
+            with pred_left:
+                st.markdown(
+                    f"""
+                    <div style="font-size:15px;font-weight:700;margin-bottom:6px;">
+                        Warna Kulit Terdeteksi
+                    </div>
+
+                    <div style="
+                        display:flex;
+                        align-items:center;
+                        gap:12px;
+                        margin-bottom:18px;">
                         <div style="
                             background:{skin_hex};
                             border-radius:8px;
-                            height:30px;
+                            height:38px;
+                            width:58%;
                             border:1px solid #ddd;">
                         </div>
                         <div style="
-                            text-align:center;
-                            font-size:10px;
-                            margin-top:2px;
-                            margin-bottom:10px;">
+                            font-size:15px;
+                            font-weight:600;
+                            color:#333;">
                             {skin_hex}
                         </div>
+                    </div>
 
-                        <div style="font-size:15px;font-weight:700;margin-bottom:4px;">
-                            Foundation Cocok
-                        </div>
+                    <div style="font-size:15px;font-weight:700;margin-bottom:6px;">
+                        Foundation Cocok
+                    </div>
+
+                    <div style="
+                        display:flex;
+                        align-items:center;
+                        gap:12px;">
                         <div style="
                             background:{result["hex_color"]};
                             border-radius:8px;
                             height:38px;
+                            width:58%;
                             border:1px solid #ddd;">
                         </div>
                         <div style="
-                            text-align:center;
-                            font-size:12px;
-                            margin-top:2px;">
+                            font-size:15px;
+                            font-weight:600;
+                            color:#333;">
                             {result["hex_color"]}
                         </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
 
                 # =========================
                 # KANAN: MST + TOP 3
@@ -638,10 +652,10 @@ def main():
                         </div>
 
                         <div style="
-                            font-size:15px;
+                            font-size:17px;
                             font-weight:700;
                             margin-bottom:4px;">
-                            Top-3 Alternatif MST
+                            Top 3 Alternatif MST
                         </div>
                         """,
                         unsafe_allow_html=True
