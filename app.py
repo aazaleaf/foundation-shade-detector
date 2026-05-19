@@ -549,80 +549,78 @@ def main():
                     result["cielab"]["b"]
                 )
 
-                pred_left, pred_right = st.columns([1.05, 1], gap="medium")
+                pred_left, pred_right = st.columns([1.08, 1], gap="medium")
 
-                # =========================
-                # KIRI: WARNA KULIT + HEX
-                # =========================
                 with pred_left:
-                    st.markdown("**Warna Kulit Terdeteksi**")
                     st.markdown(
                         f"""
+                        <div style="font-size:14px;font-weight:700;margin-bottom:6px;">
+                            Warna Kulit Terdeteksi
+                        </div>
                         <div style="
                             background:{skin_hex};
-                            border-radius:12px;
-                            height:48px;
-                            border:1px solid #ddd;
-                            margin-bottom:4px;">
+                            border-radius:10px;
+                            height:38px;
+                            border:1px solid #ddd;">
                         </div>
-                        <p style="text-align:center;font-size:12px;margin-top:0;margin-bottom:16px;">
+                        <div style="
+                            text-align:center;
+                            font-size:11px;
+                            margin-top:4px;
+                            margin-bottom:12px;">
                             {skin_hex}
-                        </p>
-                        """,
-                        unsafe_allow_html=True
-                    )
+                        </div>
 
-                    st.markdown("**Foundation Cocok**")
-                    st.markdown(
-                        f"""
+                        <div style="font-size:14px;font-weight:700;margin-bottom:6px;">
+                            Foundation Cocok
+                        </div>
                         <div style="
                             background:{result["hex_color"]};
-                            border-radius:12px;
-                            height:48px;
-                            border:1px solid #ddd;
-                            margin-bottom:4px;">
+                            border-radius:10px;
+                            height:38px;
+                            border:1px solid #ddd;">
                         </div>
-                        <p style="text-align:center;font-size:12px;margin-top:0;margin-bottom:0;">
-                            {result["hex_color"]}
-                        </p>
-                        """,
-                        unsafe_allow_html=True
-                    )
-
-                # =========================
-                # KANAN: MST + CONF + TOP 3
-                # =========================
-                with pred_right:
-                    st.markdown(
-                        f"""
                         <div style="
-                            background:#f7f7f7;
-                            border-radius:14px;
-                            padding:18px 12px;
                             text-align:center;
-                            border:1px solid #e0e0e0;
-                            margin-top:0;
-                            margin-bottom:8px;">
-                            <div style="font-size:34px;font-weight:800;line-height:1.1;">
-                                MST {result["mst_pred"]}
-                            </div>
-                            <div style="font-size:13px;color:#555;margin-top:8px;">
-                                Confidence: {result["confidence"]}%
-                            </div>
+                            font-size:11px;
+                            margin-top:4px;">
+                            {result["hex_color"]}
                         </div>
                         """,
                         unsafe_allow_html=True
                     )
 
+                with pred_right:
                     conf_pct = result["confidence"]
                     bar_color = "#2e8b57" if conf_pct >= 60 else "#e07b39" if conf_pct >= 40 else "#cc2222"
 
                     st.markdown(
                         f"""
                         <div style="
+                            background:#f7f7f7;
+                            border-radius:14px;
+                            padding:14px 12px;
+                            text-align:center;
+                            border:1px solid #e0e0e0;
+                            margin-bottom:8px;">
+                            <div style="
+                                font-size:28px;
+                                font-weight:800;
+                                line-height:1;">
+                                MST {result["mst_pred"]}
+                            </div>
+                            <div style="
+                                font-size:12px;
+                                color:#555;
+                                margin-top:7px;">
+                                Confidence: {result["confidence"]}%
+                            </div>
+                        </div>
+
+                        <div style="
                             background:#eeeeee;
                             border-radius:999px;
-                            height:10px;
+                            height:8px;
                             overflow:hidden;
                             margin-bottom:10px;">
                             <div style="
@@ -632,11 +630,16 @@ def main():
                                 border-radius:999px;">
                             </div>
                         </div>
+
+                        <div style="
+                            font-size:14px;
+                            font-weight:700;
+                            margin-bottom:6px;">
+                            Top-3 Alternatif MST
+                        </div>
                         """,
                         unsafe_allow_html=True
                     )
-
-                    st.markdown("**Top-3 Alternatif MST**")
 
                     for t in result["top3"]:
                         hex_c = t["hex"]
@@ -646,16 +649,16 @@ def main():
                                 display:flex;
                                 align-items:center;
                                 gap:8px;
-                                margin:5px 0;">
+                                margin:4px 0;">
                                 <div style="
                                     background:{hex_c};
-                                    width:28px;
-                                    height:28px;
-                                    border-radius:7px;
+                                    width:24px;
+                                    height:24px;
+                                    border-radius:6px;
                                     border:1px solid #ccc;
                                     flex-shrink:0;">
                                 </div>
-                                <span style="font-size:13px;">
+                                <span style="font-size:12px;">
                                     MST {t["mst"]} — {t["conf"]}%
                                 </span>
                             </div>
@@ -663,12 +666,36 @@ def main():
                             unsafe_allow_html=True
                         )
 
-                # =========================
-                # BAWAH: CIELAB, TEPAT DI BAWAH PREDIKSI
-                # =========================
                 st.markdown(
-                    """
-                    <hr style="margin-top:18px;margin-bottom:16px;">
+                    f"""
+                    <div style="
+                        margin-top:16px;
+                        padding-top:12px;
+                        border-top:1px solid #e2e2e2;">
+                        <div style="
+                            font-size:20px;
+                            font-weight:800;
+                            margin-bottom:10px;">
+                            Nilai CIELAB Kulit
+                        </div>
+                        <div style="
+                            display:grid;
+                            grid-template-columns:repeat(3, 1fr);
+                            gap:14px;">
+                            <div>
+                                <div style="font-size:12px;color:#444;">L* (kecerahan)</div>
+                                <div style="font-size:26px;font-weight:500;">{result["cielab"]["L"]}</div>
+                            </div>
+                            <div>
+                                <div style="font-size:12px;color:#444;">a* (merah-hijau)</div>
+                                <div style="font-size:26px;font-weight:500;">{result["cielab"]["a"]}</div>
+                            </div>
+                            <div>
+                                <div style="font-size:12px;color:#444;">b* (kuning-biru)</div>
+                                <div style="font-size:26px;font-weight:500;">{result["cielab"]["b"]}</div>
+                            </div>
+                        </div>
+                    </div>
                     """,
                     unsafe_allow_html=True
                 )
