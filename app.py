@@ -420,7 +420,7 @@ def run_pipeline(img_rgb, face_mesh, ensemble, scaler,
         "product"   : top_rec["Product"],
         "hex_color" : top_rec["mst_hex"],
         "undertone" : top_rec["Undertone"],
-        "delta_e"   : round(top_rec["delta_e"], 2),
+        "price"     : top_rec["Price"],
         "top5_recs" : recs.to_dict(orient="records"),
         "cielab"    : {
             "L": round(feats["global_L_mean"], 2),
@@ -590,8 +590,7 @@ def main():
                 | 💄 Produk | {result['product']} |
                 | 🎨 Shade | **{result['shade_name']}** |
                 | 🌡️ Undertone | {result['undertone']} |
-                | 📐 Delta E | {result['delta_e']} |
-                | ⚡ Latency | {result['latency_ms']} ms |
+                | 💰 Price | {result['price']} |
                 """)
 
                 st.markdown("**Nilai CIELAB Kulit:**")
@@ -602,10 +601,9 @@ def main():
 
                 st.markdown("**Top-5 Rekomendasi Foundation:**")
                 df_recs = pd.DataFrame(result["top5_recs"])[
-                    ["Brand", "Product", "Shade", "Undertone", "delta_e"]
-                ].rename(columns={"delta_e": "ΔE"})
-                df_recs["ΔE"] = df_recs["ΔE"].round(2)
-                st.dataframe(df_recs, use_container_width=True, hide_index=True)
+                    ["Brand", "Product", "Shade", "Undertone", "Price"]
+                ]
+                st.dataframe(df_recs, width="stretch", hide_index=True)
 
             st.caption(f"⏱️ Waktu analisis: {result['latency_ms']} ms")
 
