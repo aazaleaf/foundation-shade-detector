@@ -884,10 +884,12 @@ def main():
                 report_img.save(buffer, format="PNG")
                 buffer.seek(0)
 
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
                 st.download_button(
                     label="📥 Download Hasil Analisis",
                     data=buffer,
-                    file_name="hasil_analisis_foundation.png",
+                    file_name=f"hasil_analisis_foundation_{timestamp}.png",
                     mime="image/png",
                     use_container_width=True
                 )
