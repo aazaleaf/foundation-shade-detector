@@ -359,6 +359,12 @@ def cielab_to_hex(L, a, b):
     r, g, b_ = int(rgb[0]*255), int(rgb[1]*255), int(rgb[2]*255)
     return f"#{r:02x}{g:02x}{b_:02x}"
 
+def format_rupiah(value):
+    try:
+        value = float(value)
+        return f"Rp{value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except:
+        return value
 
 # ─────────────────────────────────────────────
 # MAIN PIPELINE
@@ -420,7 +426,7 @@ def run_pipeline(img_rgb, face_mesh, ensemble, scaler,
         "product"   : top_rec["Product"],
         "hex_color" : top_rec["mst_hex"],
         "undertone" : top_rec["Undertone"],
-        "price"     : top_rec["Price"],
+        "price"     : format_rupiah(top_rec["Price"]),
         "top5_recs" : recs.to_dict(orient="records"),
         "cielab"    : {
             "L": round(feats["global_L_mean"], 2),
@@ -603,6 +609,7 @@ def main():
                 df_recs = pd.DataFrame(result["top5_recs"])[
                     ["Brand", "Product", "Shade", "Undertone", "Price"]
                 ]
+                df_recs["Price"] = df_recs["Price"].apply(format_rupiah)
                 st.dataframe(df_recs, width="stretch", hide_index=True)
 
             st.caption(f"⏱️ Waktu analisis: {result['latency_ms']} ms")
