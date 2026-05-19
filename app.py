@@ -700,13 +700,6 @@ def main():
                     unsafe_allow_html=True
                 )
 
-                st.markdown("### Nilai CIELAB Kulit")
-
-                c1, c2, c3 = st.columns(3)
-                c1.metric("L* (kecerahan)", result["cielab"]["L"])
-                c2.metric("a* (merah-hijau)", result["cielab"]["a"])
-                c3.metric("b* (kuning-biru)", result["cielab"]["b"])
-
             st.markdown("---")
 
             # ==========================================
