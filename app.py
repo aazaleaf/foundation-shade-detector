@@ -1,6 +1,3 @@
-# app.py
-# Jalankan dengan: streamlit run app.py
-
 import streamlit as st
 import numpy as np
 import cv2
@@ -255,8 +252,10 @@ def get_skin_features(img_rgb, lms):
         for ci, ch in enumerate(['L', 'a', 'b']):
             feats[f'{zone_name}_{ch}_mean'] = float(px[:, ci].mean())
             feats[f'{zone_name}_{ch}_std']  = float(px[:, ci].std())
+        # FIX Bug 1: Formula ITA yang benar adalah atan2(L - 50, b)
+        # L dikurangi 50 sesuai standar ilmiah ITA dan konsisten dengan predict_mst_hybrid()
         feats[f'{zone_name}_ITA'] = math.degrees(
-            math.atan2(px[:, 0].mean(), px[:, 2].mean())
+            math.atan2(px[:, 0].mean() - 50, px[:, 2].mean())
         )
 
     if not all_pixels:
@@ -266,8 +265,9 @@ def get_skin_features(img_rgb, lms):
     for ci, ch in enumerate(['L', 'a', 'b']):
         feats[f'global_{ch}_mean'] = float(combined[:, ci].mean())
         feats[f'global_{ch}_std']  = float(combined[:, ci].std())
+    # FIX Bug 1: Formula ITA global juga harus L - 50
     feats['global_ITA'] = math.degrees(
-        math.atan2(combined[:, 0].mean(), combined[:, 2].mean())
+        math.atan2(combined[:, 0].mean() - 50, combined[:, 2].mean())
     )
     return feats
 
@@ -433,7 +433,10 @@ def run_pipeline(img_rgb, face_mesh, ensemble, scaler,
         "shade_name": top_rec["Shade"],
         "brand"     : top_rec["Brand"],
         "product"   : top_rec["Product"],
-        "hex_color" : top_rec["mst_hex"],
+        # FIX Bug 2: Gunakan warna LAB spesifik shade produk, bukan warna rata-rata grup MST.
+        # mst_hex adalah warna representatif seluruh grup MST yang sama untuk semua produk
+        # dalam grup tersebut, sehingga tidak mencerminkan warna shade yang direkomendasikan.
+        "hex_color" : cielab_to_hex(top_rec["lab_L"], top_rec["lab_a"], top_rec["lab_b"]),
         "skin_hex"  : skin_hex,
         "undertone" : top_rec["Undertone"],
         "price"     : format_rupiah(top_rec["Price"]),
