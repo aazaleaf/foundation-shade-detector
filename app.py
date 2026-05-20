@@ -702,7 +702,7 @@ def main():
             with pred_left:
                 st.markdown(
                     f"""
-                    <div style="font-size:17px;font-weight:700;margin-bottom:6px;">
+                    <div style="font-size:17px;font-weight:700;margin-bottom:6px;color:inherit;">
                         Warna Kulit Terdeteksi
                     </div>
 
@@ -716,17 +716,17 @@ def main():
                             border-radius:8px;
                             height:38px;
                             width:58%;
-                            border:1px solid #ddd;">
+                            border:1px solid rgba(128,128,128,0.4);">
                         </div>
                         <div style="
                             font-size:17px;
                             font-weight:700;
-                            color:#333;">
+                            color:inherit;">
                             {skin_hex}
                         </div>
                     </div>
 
-                    <div style="font-size:17px;font-weight:700;margin-bottom:6px;">
+                    <div style="font-size:17px;font-weight:700;margin-bottom:6px;color:inherit;">
                         Foundation Cocok
                     </div>
 
@@ -739,12 +739,12 @@ def main():
                             border-radius:8px;
                             height:44px;
                             width:58%;
-                            border:1px solid #ddd;">
+                            border:1px solid rgba(128,128,128,0.4);">
                         </div>
                         <div style="
                             font-size:17px;
                             font-weight:700;
-                            color:#333;">
+                            color:inherit;">
                             {result["hex_color"]}
                         </div>
                     </div>
@@ -762,28 +762,30 @@ def main():
                     st.markdown(
                         f"""
                         <div style="
-                            background:#f7f7f7;
+                            background:rgba(128,128,128,0.12);
                             border-radius:12px;
                             padding:15px 12px;
                             text-align:center;
-                            border:1px solid #e0e0e0;
+                            border:1px solid rgba(128,128,128,0.25);
                             margin-bottom:6px;">
                             <div style="
                                 font-size:38px;
                                 font-weight:800;
-                                line-height:1;">
+                                line-height:1;
+                                color:inherit;">
                                 MST {result["mst_pred"]}
                             </div>
                             <div style="
                                 font-size:17px;
-                                color:#555;
+                                color:inherit;
+                                opacity:0.7;
                                 margin-top:5px;">
                                 Confidence: {result["confidence"]}%
                             </div>
                         </div>
 
                         <div style="
-                            background:#eeeeee;
+                            background:rgba(128,128,128,0.2);
                             border-radius:999px;
                             height:6px;
                             overflow:hidden;
@@ -799,7 +801,8 @@ def main():
                         <div style="
                             font-size:17px;
                             font-weight:700;
-                            margin-bottom:4px;">
+                            margin-bottom:4px;
+                            color:inherit;">
                             Top 3 Alternatif MST
                         </div>
                         """,
@@ -820,10 +823,10 @@ def main():
                                     width:30px;
                                     height:30px;
                                     border-radius:5px;
-                                    border:1px solid #ccc;
+                                    border:1px solid rgba(128,128,128,0.4);
                                     flex-shrink:0;">
                                 </div>
-                                <span style="font-size:17px;">
+                                <span style="font-size:17px;color:inherit;">
                                     MST {t["mst"]} — {t["conf"]}%
                                 </span>
                             </div>
@@ -839,11 +842,12 @@ def main():
                     <div style="
                         margin-top:12px;
                         padding-top:10px;
-                        border-top:1px solid #e2e2e2;">
+                        border-top:1px solid rgba(128,128,128,0.3);">
                         <div style="
                             font-size:23px;
                             font-weight:800;
-                            margin-bottom:8px;">
+                            margin-bottom:8px;
+                            color:inherit;">
                             Nilai CIELAB Kulit
                         </div>
                         <div style="
@@ -851,20 +855,20 @@ def main():
                             grid-template-columns:repeat(3, 1fr);
                             gap:10px;">
                             <div>
-                                <div style="font-size:15px;color:#444;">L* (kecerahan)</div>
-                                <div style="font-size:24px;font-weight:500;line-height:1.1;">
+                                <div style="font-size:15px;opacity:0.6;color:inherit;">L* (kecerahan)</div>
+                                <div style="font-size:24px;font-weight:500;line-height:1.1;color:inherit;">
                                     {result["cielab"]["L"]}
                                 </div>
                             </div>
                             <div>
-                                <div style="font-size:15px;color:#444;">a* (merah-hijau)</div>
-                                <div style="font-size:24px;font-weight:500;line-height:1.1;">
+                                <div style="font-size:15px;opacity:0.6;color:inherit;">a* (merah-hijau)</div>
+                                <div style="font-size:24px;font-weight:500;line-height:1.1;color:inherit;">
                                     {result["cielab"]["a"]}
                                 </div>
                             </div>
                             <div>
-                                <div style="font-size:15px;color:#444;">b* (kuning-biru)</div>
-                                <div style="font-size:24px;font-weight:500;line-height:1.1;">
+                                <div style="font-size:15px;opacity:0.6;color:inherit;">b* (kuning-biru)</div>
+                                <div style="font-size:24px;font-weight:500;line-height:1.1;color:inherit;">
                                     {result["cielab"]["b"]}
                                 </div>
                             </div>
