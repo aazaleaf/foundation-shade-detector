@@ -276,7 +276,7 @@ def get_skin_features(img_rgb, lms):
 # PREDIKSI HYBRID
 # ─────────────────────────────────────────────
 def predict_mst_hybrid(feats, ensemble, scaler, kmeans, centroids, feature_cols,
-                        alpha=0.60, temperature=1.0, sigma_eucl=4.0, sigma_ita=8.0):
+                        alpha=0.40, temperature=0.6, sigma_eucl=2.0, sigma_ita=4.0):
     x    = np.array([[feats.get(c, 0.0) for c in feature_cols]])
     x_sc = scaler.transform(x)
     dist = kmeans.transform(x_sc)
