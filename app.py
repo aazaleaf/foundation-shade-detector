@@ -21,6 +21,7 @@ import pandas as pd
 from PIL import ImageDraw, ImageFont
 import tempfile
 from datetime import datetime
+from urllib.parse import quote
 
 # ─────────────────────────────────────────────
 # MEDIAPIPE — mapping dari dlib 68-point ke Face Mesh
@@ -369,6 +370,20 @@ def format_rupiah(value):
     except:
         return value
 
+def load_font(size, bold=False):
+    paths = [
+        "arialbd.ttf" if bold else "arial.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]
+
+    for p in paths:
+        try:
+            return ImageFont.truetype(p, size)
+        except:
+            continue
+
+    return ImageFont.load_default()
+
 # ─────────────────────────────────────────────
 # MAIN PIPELINE
 # ─────────────────────────────────────────────
@@ -461,107 +476,234 @@ def load_font(size, bold=False):
     return ImageFont.load_default()
 
 def create_analysis_report(result):
-    # Canvas report
-    W, H = 1400, 1000
-    bg = (255, 255, 255)
-    img = Image.new("RGB", (W, H), bg)
+    W, H = 1500, 980
+    img = Image.new("RGB", (W, H), (255, 255, 255))
     draw = ImageDraw.Draw(img)
 
-    # Font fallback
-    try:
-        font_title = load_font(42, bold=True)
-        font_h1 = load_font(34, bold=True)
-        font_h2 = load_font(28, bold=True)
-        font_text = load_font(24)
-        font_small = load_font(21)
-        font_table = load_font(20)
-        font_big = load_font(54, bold=True)
-    except:
-        font_title = ImageFont.load_default()
-        font_h2 = ImageFont.load_default()
-        font_text = ImageFont.load_default()
-        font_small = ImageFont.load_default()
-        font_big = ImageFont.load_default()
+    # Font
+    font_title = load_font(34, bold=True)
+    font_h1 = load_font(28, bold=True)
+    font_h2 = load_font(23, bold=True)
+    font_text = load_font(20)
+    font_text_bold = load_font(20, bold=True)
+    font_small = load_font(17)
+    font_small_bold = load_font(17, bold=True)
+    font_big = load_font(48, bold=True)
 
-    # Title
-    draw.text((50, 35), "Foundation Shade Detector - Hasil Analisis", fill=(30, 30, 30), font=font_title)
+    # Colors
+    black = (25, 30, 45)
+    gray = (90, 90, 90)
+    border = (215, 215, 215)
+    header_bg = (246, 247, 250)
+    card_bg = (248, 248, 248)
+    red = (215, 35, 35)
 
-    # Frame landmark
+    def text(x, y, value, font=font_text, fill=black):
+        draw.text((x, y), str(value), fill=fill, font=font)
+
+    def truncate(value, max_len):
+        value = str(value)
+        return value if len(value) <= max_len else value[:max_len - 3] + "..."
+
+    def draw_table(x, y, headers, rows, col_widths, row_h=42):
+        # Header
+        x_pos = x
+        for header, cw in zip(headers, col_widths):
+            draw.rectangle(
+                (x_pos, y, x_pos + cw, y + row_h),
+                fill=header_bg,
+                outline=border
+            )
+            text(x_pos + 10, y + 11, header, font_small_bold)
+            x_pos += cw
+
+        # Rows
+        for r_idx, row in enumerate(rows):
+            y1 = y + row_h * (r_idx + 1)
+            x_pos = x
+
+            for value, cw in zip(row, col_widths):
+                draw.rectangle(
+                    (x_pos, y1, x_pos + cw, y1 + row_h),
+                    fill=(255, 255, 255),
+                    outline=border
+                )
+                text(x_pos + 10, y1 + 11, value, font_small)
+                x_pos += cw
+
+    # =====================
+    # TITLE
+    # =====================
+    text(50, 32, "Hasil Analisis Foundation Shade Detector", font_title)
+
+    # =====================
+    # FRAME + LANDMARK
+    # =====================
+    left_x = 50
+    top_y = 95
+
+    text(left_x, top_y, "Frame + Landmark", font_h1)
+
     frame = Image.fromarray(result["vis_frame"]).convert("RGB")
-    frame.thumbnail((520, 380))
-    draw.text((50, 115), "Frame + Landmark", fill=(30, 30, 30), font=font_h2)
-    img.paste(frame, (50, 165))
+    frame.thumbnail((540, 350))
 
-    # Prediksi MST
-    x = 630
-    y = 115
-    draw.text((x, y), "Prediksi MST", fill=(30, 30, 30), font=font_h2)
+    frame_x = left_x
+    frame_y = top_y + 55
+    img.paste(frame, (frame_x, frame_y))
+    draw.rectangle(
+        (frame_x, frame_y, frame_x + frame.width, frame_y + frame.height),
+        outline=border,
+        width=2
+    )
 
-    # Color boxes
-    skin_hex = result.get("skin_hex", "")
-    detected_hex = skin_hex if skin_hex else "-"
+    # =====================
+    # PREDIKSI MST
+    # =====================
+    right_x = 630
+    text(right_x, top_y, "Prediksi MST", font_h1)
+
+    skin_hex = result.get("skin_hex", "#cccccc")
     foundation_hex = result["hex_color"]
 
-    draw.text((x, y + 60), "Warna Kulit Terdeteksi", fill=(40, 40, 40), font=font_text)
-    draw.rounded_rectangle((x, y + 100, x + 260, y + 150), radius=12, fill=detected_hex if detected_hex != "-" else "#cccccc", outline=(200, 200, 200))
-    draw.text((x + 285, y + 112), detected_hex, fill=(40, 40, 40), font=font_text)
+    # Warna kulit
+    color_y = top_y + 65
+    text(right_x, color_y, "Warna Kulit Terdeteksi", font_text_bold)
 
-    draw.text((x, y + 180), "Foundation Cocok", fill=(40, 40, 40), font=font_text)
-    draw.rounded_rectangle((x, y + 220, x + 260, y + 270), radius=12, fill=foundation_hex, outline=(200, 200, 200))
-    draw.text((x + 285, y + 232), foundation_hex, fill=(40, 40, 40), font=font_text)
+    draw.rounded_rectangle(
+        (right_x, color_y + 38, right_x + 280, color_y + 88),
+        radius=10,
+        fill=skin_hex,
+        outline=border
+    )
+    text(right_x + 305, color_y + 50, skin_hex, font_text_bold)
+
+    # Foundation
+    found_y = color_y + 120
+    text(right_x, found_y, "Foundation Cocok", font_text_bold)
+
+    draw.rounded_rectangle(
+        (right_x, found_y + 38, right_x + 280, found_y + 88),
+        radius=10,
+        fill=foundation_hex,
+        outline=border
+    )
+    text(right_x + 305, found_y + 50, foundation_hex, font_text_bold)
 
     # MST card
-    card_x = 1050
-    card_y = 175
-    draw.rounded_rectangle((card_x, card_y, card_x + 280, card_y + 150), radius=20, fill=(245, 245, 245), outline=(220, 220, 220))
-    draw.text((card_x + 55, card_y + 35), f"MST {result['mst_pred']}", fill=(25, 25, 25), font=font_big)
-    draw.text((card_x + 55, card_y + 105), f"Confidence: {result['confidence']}%", fill=(80, 80, 80), font=font_small)
+    card_x = 1080
+    card_y = top_y + 45
+
+    draw.rounded_rectangle(
+        (card_x, card_y, card_x + 360, card_y + 145),
+        radius=18,
+        fill=card_bg,
+        outline=border
+    )
+
+    text(card_x + 105, card_y + 28, f"MST {result['mst_pred']}", font_big)
+    text(card_x + 95, card_y + 93, f"Confidence: {result['confidence']}%", font_text, gray)
+
+    # Bar confidence
+    conf_pct = float(result["confidence"])
+    bar_y = card_y + 160
+    draw.rounded_rectangle(
+        (card_x, bar_y, card_x + 360, bar_y + 172),
+        radius=8,
+        fill=(235, 235, 235)
+    )
+    draw.rounded_rectangle(
+        (card_x, bar_y, card_x + int(360 * conf_pct / 100), bar_y + 172),
+        radius=8,
+        fill=red
+    )
 
     # Top 3
-    draw.text((1050, 360), "Top-3 Alternatif MST", fill=(40, 40, 40), font=font_text)
-    yy = 405
+    top3_y = bar_y + 35
+    text(card_x, top3_y, "Top-3 Alternatif MST", font_text_bold)
+
+    yy = top3_y + 40
     for t in result["top3"]:
-        draw.rounded_rectangle((1050, yy, 1085, yy + 35), radius=6, fill=t["hex"], outline=(180, 180, 180))
-        draw.text((1100, yy + 3), f"MST {t['mst']} - {t['conf']}%", fill=(40, 40, 40), font=font_small)
-        yy += 48
+        draw.rounded_rectangle(
+            (card_x, yy, card_x + 34, yy + 34),
+            radius=6,
+            fill=t["hex"],
+            outline=border
+        )
+        text(card_x + 50, yy + 5, f"MST {t['mst']} — {t['conf']}%", font_small)
+        yy += 45
 
+    # =====================
     # CIELAB
-    draw.text((630, 470), "Nilai CIELAB Kulit", fill=(30, 30, 30), font=font_h2)
-    draw.text((630, 525), f"L*  : {result['cielab']['L']}", fill=(40, 40, 40), font=font_text)
-    draw.text((830, 525), f"a*  : {result['cielab']['a']}", fill=(40, 40, 40), font=font_text)
-    draw.text((1030, 525), f"b*  : {result['cielab']['b']}", fill=(40, 40, 40), font=font_text)
+    # =====================
+    cielab_y = 410
+    draw.line((right_x, cielab_y, 1440, cielab_y), fill=border, width=2)
 
-    # Rekomendasi utama
-    y2 = 620
-    draw.line((50, y2 - 30, 1350, y2 - 30), fill=(220, 220, 220), width=2)
-    draw.text((50, y2), "Rekomendasi Foundation", fill=(30, 30, 30), font=font_h2)
+    text(right_x, cielab_y + 28, "Nilai CIELAB Kulit", font_h2)
 
-    rec_lines = [
-        f"Brand      : {result['brand']}",
-        f"Produk     : {result['product']}",
-        f"Shade      : {result['shade_name']}",
-        f"Undertone  : {result['undertone']}",
-        f"Price      : {result['price']}",
+    label_y = cielab_y + 75
+    value_y = cielab_y + 100
+
+    text(right_x, label_y, "L* (kecerahan)", font_small, gray)
+    text(right_x, value_y, result["cielab"]["L"], font_h1)
+
+    text(right_x + 270, label_y, "a* (merah-hijau)", font_small, gray)
+    text(right_x + 270, value_y, result["cielab"]["a"], font_h1)
+
+    text(right_x + 540, label_y, "b* (kuning-biru)", font_small, gray)
+    text(right_x + 540, value_y, result["cielab"]["b"], font_h1)
+
+    # Divider utama
+    draw.line((50, 570, 1450, 570), fill=border, width=2)
+
+    # =====================
+    # REKOMENDASI FOUNDATION TABLE
+    # =====================
+    bottom_y = 620
+    text(50, bottom_y, "Rekomendasi Foundation", font_h1)
+
+    rec_headers = ["Info", "Detail"]
+    rec_rows = [
+        ["Brand", result["brand"]],
+        ["Produk", truncate(result["product"], 32)],
+        ["Shade", result["shade_name"]],
+        ["Undertone", result["undertone"]],
+        ["Price", result["price"]],
     ]
 
-    yy = y2 + 55
-    for line in rec_lines:
-        draw.text((50, yy), line, fill=(40, 40, 40), font=font_text)
-        yy += 38
+    draw_table(
+        x=50,
+        y=bottom_y + 55,
+        headers=rec_headers,
+        rows=rec_rows,
+        col_widths=[150, 420],
+        row_h=46
+    )
 
-    # Top 5
-    draw.text((700, y2), "Top-5 Rekomendasi Foundation", fill=(30, 30, 30), font=font_h2)
-    yy = y2 + 55
+    # =====================
+    # TOP 5 TABLE
+    # =====================
+    text(660, bottom_y, "Top-5 Rekomendasi Foundation", font_h1)
 
-    for i, rec in enumerate(result["top5_recs"][:5], start=1):
-        brand = str(rec.get("Brand", "-"))
-        shade = str(rec.get("Shade", "-"))
-        undertone = str(rec.get("Undertone", "-"))
-        price = format_rupiah(rec.get("Price", "-"))
+    top5_headers = ["Brand", "Product", "Shade", "Undertone", "Price"]
+    top5_rows = []
 
-        line = f"{i}. {brand} | {shade} | {undertone} | {price}"
-        draw.text((700, yy), line[:55], fill=(40, 40, 40), font=font_small)
-        yy += 40
+    for rec in result["top5_recs"][:5]:
+        top5_rows.append([
+            truncate(rec.get("Brand", "-"), 12),
+            truncate(rec.get("Product", "-"), 36),
+            truncate(rec.get("Shade", "-"), 12),
+            truncate(rec.get("Undertone", "-"), 10),
+            format_rupiah(rec.get("Price", "-")),
+        ])
+
+    draw_table(
+        x=660,
+        y=bottom_y + 55,
+        headers=top5_headers,
+        rows=top5_rows,
+        col_widths=[120, 370, 110, 115, 140],
+        row_h=46
+    )
 
     return img
 
