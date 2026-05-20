@@ -846,22 +846,6 @@ def main():
                     unsafe_allow_html=True
                 )
 
-                st.markdown(
-                    f"""
-                    <div style="
-                        margin-top:12px;
-                        font-size:19px;
-                        font-weight:700;
-                        line-height:1.35;
-                        color:inherit;">
-                        Undertone: <span style="font-weight:800;">{result["user_undertone"]}</span>
-                        <span style="opacity:0.45;"> | </span>
-                        Skintone: <span style="font-weight:800;">{result["user_skintone"]}</span>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
                 # =========================
                 # KANAN: MST + TOP 3
                 # =========================
