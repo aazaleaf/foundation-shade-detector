@@ -369,6 +369,75 @@ def format_rupiah(value):
     except:
         return value
 
+def estimate_user_undertone(a, b):
+    """
+    Estimasi undertone pengguna dari nilai CIELAB.
+    b* tinggi cenderung warm/yellowish,
+    b* rendah cenderung cool,
+    area tengah dianggap neutral.
+    """
+    if b >= 14:
+        return "Warm"
+    elif b <= 10:
+        return "Cool"
+    else:
+        return "Neutral"
+
+
+def estimate_user_skintone(mst):
+    """
+    Estimasi skintone berdasarkan prediksi MST.
+    MST 1-3  : Light/Fair
+    MST 4-6  : Medium
+    MST 7-10 : Deep
+    """
+    if mst <= 3:
+        return "Light/Fair"
+    elif mst <= 6:
+        return "Medium"
+    else:
+        return "Deep"
+    
+def classify_user_skintone_from_mst(mst):
+    """
+    Klasifikasi skintone pengguna berdasarkan hasil MST.
+    MST 1-3  : Light/Fair
+    MST 4-6  : Medium
+    MST 7-10 : Deep
+    """
+    try:
+        mst = int(mst)
+    except:
+        return "-"
+
+    if mst <= 3:
+        return "Light/Fair"
+    elif mst <= 6:
+        return "Medium"
+    else:
+        return "Deep"
+
+
+def classify_user_undertone_from_lab(a, b):
+    """
+    Estimasi undertone pengguna dari nilai CIELAB.
+    Heuristik sederhana:
+    - b* jauh lebih tinggi dari a* -> Warm
+    - a* lebih dominan dibanding b* -> Cool
+    - selain itu -> Neutral
+    """
+    try:
+        score = float(b) - float(a)
+    except:
+        return "-"
+
+    if score >= 3:
+        return "Warm"
+    elif score <= -2:
+        return "Cool"
+    else:
+        return "Neutral"
+
 # ─────────────────────────────────────────────
 # MAIN PIPELINE
 # ─────────────────────────────────────────────
@@ -426,6 +495,13 @@ def run_pipeline(img_rgb, face_mesh, ensemble, scaler,
     feats["global_b_mean"]
     )
     
+    user_undertone = estimate_user_undertone(
+    feats["global_a_mean"],
+    feats["global_b_mean"]
+    )
+
+    user_skintone = estimate_user_skintone(mst)
+    
     return {
         "mst_pred"  : mst,
         "confidence": conf,
@@ -438,6 +514,8 @@ def run_pipeline(img_rgb, face_mesh, ensemble, scaler,
         # dalam grup tersebut, sehingga tidak mencerminkan warna shade yang direkomendasikan.
         "hex_color" : cielab_to_hex(top_rec["lab_L"], top_rec["lab_a"], top_rec["lab_b"]),
         "skin_hex"  : skin_hex,
+        "user_undertone": user_undertone,
+        "user_skintone" : user_skintone,
         "undertone" : top_rec["Undertone"],
         "price"     : format_rupiah(top_rec["Price"]),
         "top5_recs" : recs.to_dict(orient="records"),
@@ -512,6 +590,13 @@ def create_analysis_report(result):
     draw.text((x, y + 180), "Foundation Cocok", fill=(40, 40, 40), font=font_text)
     draw.rounded_rectangle((x, y + 220, x + 260, y + 270), radius=12, fill=foundation_hex, outline=(200, 200, 200))
     draw.text((x + 285, y + 232), foundation_hex, fill=(40, 40, 40), font=font_text)
+
+    draw.text(
+        (x, y + 300),
+        f"Undertone: {result.get('user_undertone', '-')}  |  Skintone: {result.get('user_skintone', '-')}",
+        fill=(40, 40, 40),
+        font=font_text
+    )
 
     # MST card
     card_x = 1050
@@ -747,6 +832,31 @@ def main():
                             color:inherit;">
                             {result["hex_color"]}
                         </div>
+                    </div>
+
+                    <div style="
+                        margin-top:14px;
+                        font-size:20px;
+                        font-weight:750;
+                        color:inherit;">
+                        Undertone: {result["user_undertone"]} | Skintone: {result["user_skintone"]}
+                    </div>
+
+                    """,
+                    unsafe_allow_html=True
+                )
+
+                st.markdown(
+                    f"""
+                    <div style="
+                        margin-top:12px;
+                        font-size:19px;
+                        font-weight:700;
+                        line-height:1.35;
+                        color:inherit;">
+                        Undertone: <span style="font-weight:800;">{result["user_undertone"]}</span>
+                        <span style="opacity:0.45;"> | </span>
+                        Skintone: <span style="font-weight:800;">{result["user_skintone"]}</span>
                     </div>
                     """,
                     unsafe_allow_html=True
