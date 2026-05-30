@@ -1,5 +1,10 @@
-__pycache__/
-.ipynb_checkpoints/
+mst-e_data/
 venv/
+.ipynb_checkpoints/
+*.ipynb_checkpoints/
+tempCodeRunnerFile.ipynb
+__pycache__/
+*.pyc
 .env
-.DS_Store
+CAPSTONE_V2.ipynb
+shape_predictor_68_face_landmarks.dat

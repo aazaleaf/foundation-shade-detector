@@ -339,7 +339,7 @@ def predict_mst_hybrid(feats, ensemble, scaler, kmeans, centroids, feature_cols,
 # ─────────────────────────────────────────────
 # REKOMENDASI
 # ─────────────────────────────────────────────
-def recommend_foundation(mst_pred, L, a, b, df_found, top_n=5):
+def recommend_foundation(mst_pred, L, a, b, df_found, top_n=6):
     df = df_found.copy()
     df['delta_e'] = np.sqrt(
         (df['lab_L'] - L)**2 +
@@ -653,377 +653,499 @@ def create_analysis_report(result):
 
     return img
 
-# ─────────────────────────────────────────────
-# STREAMLIT UI
-# ─────────────────────────────────────────────
-def main():
-    st.set_page_config(
-        page_title="Foundation Shade Detector",
-        page_icon="🎨",
-        layout="wide",
-    )
 
-    st.markdown(
-    """
+# ─────────────────────────────────────────────
+# SHADEMATE FINAL UI v4 — UI baru + pipeline asli app_backup.py
+# ─────────────────────────────────────────────
+from pathlib import Path
+import base64
+import html
+import re
+
+APP_DIR = Path(__file__).parent
+ASSETS_DIR = APP_DIR / "assets"
+PRODUCT_DIR = ASSETS_DIR / "products"
+
+MST_COLORS = {
+    1:"#f6ede4", 2:"#f3e7db", 3:"#f7ead0", 4:"#eadaba", 5:"#d7bd96",
+    6:"#a07850", 7:"#825c43", 8:"#604134", 9:"#3a312a", 10:"#292420"
+}
+
+BRANDS = [
+    "Wardah", "Luxcrime", "Omg", "Mop", "Jacquelle", "Dazzle Me",
+    "Make Over", "Maybelline", "Fenty Beauty", "L'Oreal Paris"
+]
+
+
+def load_css():
+    css_path = APP_DIR / "style.css"
+    if css_path.exists():
+        st.markdown(f"<style>{css_path.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
+
+
+
+def inject_ui_hotfix_css():
+    st.markdown("""
     <style>
-    [data-testid="stCameraInput"] video,
-    [data-testid="stCameraInput"] img {
-        transform: scaleX(-1);
+    header, [data-testid="stHeader"] { visibility: visible !important; display:block !important; background:transparent !important; height:3.2rem !important; }
+    [data-testid="collapsedControl"], [data-testid="stSidebarCollapsedControl"], button[kind="header"], button[data-testid="baseButton-header"] {
+        visibility: visible !important; display:flex !important; opacity:1 !important; color:#758952 !important; background:rgba(255,240,245,.95) !important; border:1px solid rgba(255,168,214,.55) !important; border-radius:999px !important; box-shadow:0 8px 18px rgba(200,107,133,.16) !important;
     }
+    [data-testid="collapsedControl"] svg, [data-testid="stSidebarCollapsedControl"] svg, button[kind="header"] svg, button[data-testid="baseButton-header"] svg { color:#758952 !important; fill:#758952 !important; stroke:#758952 !important; }
+    .stApp, .main, [data-testid="stAppViewContainer"], [data-testid="stSidebar"] { color:#2F2330 !important; }
+    .stApp p, .stApp span, .stApp label, .stApp div, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6 { color: inherit; }
+    .stButton > button:not([kind="primary"]) { background:rgba(255,255,255,.86) !important; color:#758952 !important; border:1px solid rgba(117,137,82,.65) !important; box-shadow:none !important; }
+    .stButton > button:not([kind="primary"]) * { color:#758952 !important; }
+    .stButton > button[kind="primary"] { background:linear-gradient(135deg,#F48ABD,#E7569F) !important; color:white !important; border:0 !important; }
+    .stButton > button[kind="primary"] * { color:white !important; }
+
+    .upload-real-card [data-testid="stFileUploader"] { background:rgba(255,255,255,.80) !important; border:2px dashed rgba(255,168,214,.72) !important; border-radius:1.35rem !important; min-height:355px !important; display:flex !important; align-items:center !important; justify-content:center !important; padding:1.4rem !important; box-shadow:0 16px 35px rgba(244,138,189,.10); }
+    .upload-real-card [data-testid="stFileUploaderDropzone"] { background:transparent !important; border:0 !important; min-height:310px !important; width:100% !important; display:flex !important; align-items:center !important; justify-content:center !important; flex-direction:column !important; text-align:center !important; color:#2F2330 !important; }
+    .upload-real-card [data-testid="stFileUploaderDropzone"]::before { content:"⇧"; width:86px; height:86px; border-radius:1.45rem; background:#F9D1D9; color:#F48ABD; display:flex; align-items:center; justify-content:center; font-size:3rem; font-weight:900; margin-bottom:1rem; }
+    .upload-real-card [data-testid="stFileUploaderDropzone"] button { background:#FFF0F5 !important; border:1px solid rgba(255,168,214,.55) !important; border-radius:999px !important; color:#D94E91 !important; font-weight:900 !important; }
+
+    .camera-real-card [data-testid="stCameraInput"] { background:rgba(255,255,255,.85) !important; border:1.5px solid rgba(255,168,214,.78) !important; border-radius:1.35rem !important; min-height:330px !important; padding:1.1rem !important; box-shadow:0 16px 35px rgba(244,138,189,.10); color:#2F2330 !important; overflow:hidden !important; }
+    .camera-real-card [data-testid="stCameraInput"] * { color:#2F2330 !important; }
+    .camera-real-card [data-testid="stCameraInput"] video, .camera-real-card [data-testid="stCameraInput"] img { transform:none !important; max-height:300px !important; object-fit:contain !important; border-radius:1rem !important; }
+    .camera-real-card [data-testid="stCameraInput"] button { background:linear-gradient(135deg,#BADF93,#838F58) !important; color:white !important; border:0 !important; border-radius:.85rem !important; font-weight:900 !important; }
+
+
+    .analysis-preview-img img { border-radius:1rem !important; border:1px solid rgba(255,168,214,.35); box-shadow:0 12px 24px rgba(0,0,0,.08); }
+    .html-product-card{ background:rgba(255,255,255,.80); border:1px solid rgba(255,168,214,.45); border-radius:1.15rem; padding:1rem; min-height:235px; box-shadow:0 16px 30px rgba(200,107,133,.08); margin-bottom:1rem; }
+    .html-product-top{ display:grid; grid-template-columns:92px 1fr 120px; gap:1rem; align-items:start; }
+    .html-product-img{ width:82px; height:104px; object-fit:contain; border-radius:.8rem; background:#FFF0F5; border:1px solid rgba(232,192,197,.45); }
+    .html-brand{ font-size:.78rem; color:#7B6472; letter-spacing:.08em; text-transform:uppercase; font-weight:900; margin-bottom:.2rem; }
+    .html-name{ font-weight:900; color:#2F2330; font-size:1rem; margin-bottom:.45rem; }
+    .html-price{ text-align:right; font-weight:900; color:#2F2330; font-size:1.02rem; }
+    .html-reason{ background:rgba(255,240,245,.75); border-radius:.75rem; padding:.55rem .7rem; color:#7B6472; font-size:.82rem; margin:.65rem 0; }
+    .html-bar{ height:9px; border-radius:999px; background:rgba(232,192,197,.45); overflow:hidden; margin-top:.35rem; }
+    .html-bar > div{ height:100%; border-radius:999px; background:linear-gradient(90deg,#BADF93,#758952); }
+
+    /* Camera card dibuat lebih ringkas + foto kamera tidak mirror */
+    .camera-intro-card{ padding:.72rem .9rem !important; margin-top:.75rem !important; margin-bottom:.65rem !important; text-align:center; }
+    .camera-intro-card .upload-symbol{ width:42px !important; height:42px !important; font-size:1.1rem !important; margin:0 auto .35rem !important; border-radius:1rem !important; }
+    .camera-intro-card h3{ font-size:1.05rem !important; margin:0 !important; }
+    .camera-intro-card .small-text{ font-size:.78rem !important; }
+    .camera-real-card [data-testid="stCameraInput"]{ min-height:235px !important; padding:.65rem !important; }
+    .camera-real-card [data-testid="stCameraInput"] > div,
+    [data-testid="stCameraInput"] > div{ width:100% !important; }
+    /* Live preview dan hasil foto di widget kamera dibuat tidak mirror + ukurannya normal */
+    .camera-real-card [data-testid="stCameraInput"] video,
+    .camera-real-card [data-testid="stCameraInput"] img,
+    .camera-real-card [data-testid="stCameraInput"] canvas,
+    [data-testid="stCameraInput"] video,
+    [data-testid="stCameraInput"] img,
+    [data-testid="stCameraInput"] canvas,
+    [data-testid="stCameraInput"] video[playsinline]{
+        width:100% !important;
+        max-width:100% !important;
+        height:auto !important;
+        max-height:none !important;
+        object-fit:contain !important;
+        display:block !important;
+        margin:0 auto !important;
+        transform:scaleX(-1) !important;
+        -webkit-transform:scaleX(-1) !important;
+        border-radius:1rem !important;
+    }
+
+    /* Radio filter dan input mode dibuat seperti pill/elips kecil */
+    [data-testid="stRadio"] div[role="radiogroup"]{ gap:.65rem 1.1rem !important; align-items:center !important; flex-wrap:wrap !important; }
+    [data-testid="stRadio"] label{ border-radius:999px !important; padding:.56rem 1.05rem !important; border:1px solid transparent !important; background:transparent !important; min-height:unset !important; color:#758952 !important; }
+    [data-testid="stRadio"] label:has(input:checked){ background:#F9C3DE !important; color:#2F2330 !important; border-color:#F9C3DE !important; box-shadow:0 10px 20px rgba(244,138,189,.14) !important; }
+    [data-testid="stRadio"] label > div:first-child{ display:none !important; }
+    [data-testid="stRadio"] p{ font-weight:800 !important; color:#5E4A59 !important; }
+
+    /* Sidebar menu rata kiri */
+    [data-testid="stSidebar"] [data-testid="stRadio"] div[role="radiogroup"]{ align-items:stretch !important; gap:.55rem !important; }
+    [data-testid="stSidebar"] [data-testid="stRadio"] label{ width:100% !important; justify-content:flex-start !important; text-align:left !important; padding:.82rem 1rem !important; }
+    [data-testid="stSidebar"] [data-testid="stRadio"] p{ width:100% !important; text-align:left !important; }
+
+    /* Panel filter recommendation seperti mockup */
+    .filters-header-box{ border:1.6px solid rgba(255,168,214,.58); border-radius:1.2rem; padding:1.05rem 1.35rem; background:rgba(255,255,255,.48); margin-bottom:.95rem; }
+    .filters-shell{ padding:0 .2rem .2rem .2rem; }
+    .filter-group{ margin-bottom:1.05rem; }
+    .filter-group-title{ font-weight:700; font-size:1rem; margin-bottom:.45rem; color:#5E4A59; }
+
+    /* Processing Pipeline horizontal seperti mockup */
+    .pipeline-card{ padding:1.4rem 1.6rem 1.8rem !important; overflow:hidden !important; margin-bottom:1.55rem !important; }
+    .method-timeline{ display:grid !important; grid-template-columns:repeat(6,minmax(110px,1fr)) !important; gap:2.4rem !important; align-items:start !important; text-align:center !important; margin-top:.85rem !important; }
+    .method-step{ position:relative !important; min-height:145px !important; }
+    .method-step:not(:last-child)::after{ content:'⟶'; position:absolute; right:-2.05rem; top:48px; color:#F48ABD; font-weight:900; opacity:.92; font-size:2rem; line-height:1; }
+    .method-step .step-badge{ width:22px !important; height:22px !important; border-radius:999px !important; display:flex !important; align-items:center !important; justify-content:center !important; color:white !important; font-size:.78rem !important; font-weight:900 !important; margin:0 auto .45rem !important; }
+    .method-step .method-icon{ width:58px !important; height:58px !important; border-radius:1rem !important; display:flex !important; align-items:center !important; justify-content:center !important; font-size:1.75rem !important; margin:.25rem auto .55rem !important; border:1px solid currentColor !important; }
+    .method-step .method-title{ font-weight:900 !important; margin-top:.35rem !important; line-height:1.25 !important; }
+    .method-cards-row{ margin-top:.3rem !important; }
+
+    /* Technology stack diperkecil */
+    .tech-stack-box{ padding:1rem 1.15rem !important; margin-top:1rem !important; }
+    .tech-stack-box h3{ font-size:1.7rem !important; margin-bottom:.5rem !important; }
+    .tech-card.compact{ padding:.75rem .85rem !important; border-radius:1rem !important; min-height:unset !important; }
+    .tech-card.compact strong{ font-size:.92rem !important; }
+    .tech-card.compact .small-text{ font-size:.72rem !important; line-height:1.4 !important; }
+    .tech-icon.compact{ width:36px !important; height:36px !important; font-size:1rem !important; }
+
+    @media(max-width:900px){ .method-timeline{ grid-template-columns:repeat(2,1fr) !important; } .method-step::after{ display:none !important; } }
+
+    #MainMenu, footer, [data-testid="stDecoration"] { visibility:hidden !important; display:none !important; }
     </style>
-    """,
-    unsafe_allow_html=True
-    )
+    """, unsafe_allow_html=True)
 
-    st.title("🎨 Foundation Shade Detector")
-    st.caption("Monk Skin Tone (MST) Detection + Rekomendasi Foundation via Webcam")
 
-    with st.spinner("Memuat model & database foundation..."):
-        try:
-            (face_mesh, ensemble, scaler,
-             kmeans, df_found, centroids, mst_hex_lookup) = load_resources()
-            st.success(f"✅ Model siap | Foundation DB: {len(df_found)} produk")
-        except Exception as e:
-            st.error(f"❌ Gagal load model: {e}")
-            st.stop()
+def slug(text):
+    return re.sub(r"[^a-z0-9]+", "_", str(text).lower()).strip("_")
 
-    with st.sidebar:
-        st.header("ℹ️ Petunjuk")
-        st.markdown("""
-        1. Klik **'Ambil Foto'** di bawah
-        2. Izinkan akses kamera jika diminta
-        3. Pastikan wajah terlihat jelas & cahaya cukup
-        4. Klik tombol kamera untuk mengambil foto
-        5. Hasil prediksi MST & rekomendasi foundation akan muncul
-        """)
-        st.divider()
-        st.markdown("**Tentang MST (Monk Skin Tone)**")
-        st.markdown("Skala 1–10 untuk mengukur warna kulit secara inklusif, "
-                    "dikembangkan oleh Dr. Ellis Monk (Google).")
 
-        st.markdown("**Referensi Warna MST:**")
-        mst_colors = {
-            1: "#f6ede4", 2: "#f3e7db", 3: "#f7ead0", 4: "#eadaba",
-            5: "#d7bd96", 6: "#a07850", 7: "#825c43", 8: "#604134",
-            9: "#3a312a", 10: "#292420"
-        }
-        cols_mst = st.columns(5)
-        for i, (mst_id, hex_c) in enumerate(mst_colors.items()):
-            with cols_mst[i % 5]:
-                st.markdown(
-                    f'<div style="background:{hex_c};border-radius:6px;'
-                    f'height:28px;display:flex;align-items:center;'
-                    f'justify-content:center;color:{"#000" if i < 5 else "#fff"};'
-                    f'font-size:11px;font-weight:bold">MST {mst_id}</div>',
-                    unsafe_allow_html=True
-                )
+def product_image_path(brand, shade=None):
+    if shade:
+        possible = [
+            PRODUCT_DIR / str(brand) / f"{shade}.jpg",
+            PRODUCT_DIR / str(brand) / f"{shade}.png",
+            PRODUCT_DIR / str(brand) / f"{shade}.jpeg",
+            PRODUCT_DIR / str(brand) / f"{shade}.webp",
+        ]
+        for path in possible:
+            if path.exists():
+                return str(path)
+    brand_fallback = PRODUCT_DIR / f"{slug(brand)}.png"
+    if brand_fallback.exists():
+        return str(brand_fallback)
+    for dummy in [PRODUCT_DIR / "dummy_product.png", ASSETS_DIR / "dummy_product.png"]:
+        if dummy.exists():
+            return str(dummy)
+    return None
 
-    st.subheader("📷 Input Foto")
 
-    input_mode = st.radio(
-        "Pilih metode input:",
-        ["Kamera", "Upload Foto"],
-        horizontal=True
-    )
 
-    camera_image = None
-    uploaded_image = None
+def encode_image_for_html(img_path):
+    try:
+        p = Path(img_path)
+        if not p.exists():
+            return ""
+        ext = p.suffix.lower().replace('.', '')
+        if ext == 'jpg':
+            ext = 'jpeg'
+        data = base64.b64encode(p.read_bytes()).decode('utf-8')
+        return f"data:image/{ext};base64,{data}"
+    except Exception:
+        return ""
 
-    if input_mode == "Kamera":
-        camera_image = st.camera_input(
-            "Ambil foto wajah",
-            help="Izinkan akses kamera di browser jika diminta"
-        )
-    else:
-        uploaded_image = st.file_uploader(
-            "Upload foto wajah",
-            type=["jpg", "jpeg", "png"]
-        )
+def ehtml(value):
+    return html.escape(str(value)) if value is not None else "-"
 
-    image_source = camera_image if camera_image is not None else uploaded_image
+def safe_similarity(delta_e):
+    try:
+        return float(np.clip(100 - float(delta_e) * 2.8, 55, 99.2))
+    except Exception:
+        return 88.0
 
-    if image_source is not None:
-        file_bytes = np.asarray(bytearray(image_source.read()), dtype=np.uint8)
-        img_bgr    = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-        img_rgb    = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
 
-        if input_mode == "Kamera":
-            img_rgb = cv2.flip(img_rgb, 1)
+def ImageColor_get_rgb(hex_color):
+    hex_color = str(hex_color).strip().replace("#", "")
+    if len(hex_color) != 6:
+        return (196, 149, 106)
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
-        st.subheader("🔍 Hasil Analisis")
 
-        with st.spinner("Menganalisis wajah..."):
-            result, error = run_pipeline(
-                img_rgb, face_mesh, ensemble, scaler,
-                kmeans, centroids, df_found, mst_hex_lookup, FEATURE_COLS
-            )
+def render_sidebar():
+    st.sidebar.markdown("""
+    <div class="sidebar-brand">
+        <div class="logo-box">✿</div>
+        <div>
+            <div class="brand-kicker">Capstone 27</div>
+            <div class="brand-name">ShadeMate</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    pages = ["Home", "Skin Analysis", "Results", "Recommendations", "About Method"]
+    icons = {"Home":"🏠", "Skin Analysis":"📷", "Results":"📊", "Recommendations":"✨", "About Method":"📖"}
+    current = st.session_state.get("page", "Home")
+    page = st.sidebar.radio("Menu", pages, index=pages.index(current), format_func=lambda x: f"{icons[x]}  {x}", label_visibility="collapsed")
+    st.sidebar.markdown("""
+    <div class="sidebar-footer"><div>ShadeMate v1.0</div><div>Capstone 27</div></div>
+    """, unsafe_allow_html=True)
+    st.session_state["page"] = page
+    return page
 
-        if error:
-            st.warning(error)
+
+def get_resources_or_stop():
+    if "resources_loaded" not in st.session_state:
+        with st.spinner("Memuat model & database foundation..."):
+            try:
+                (face_mesh, ensemble, scaler, kmeans, df_found, centroids, mst_hex_lookup) = load_resources()
+                st.session_state["resources"] = {
+                    "face_mesh": face_mesh, "ensemble": ensemble, "scaler": scaler,
+                    "kmeans": kmeans, "df_found": df_found, "centroids": centroids,
+                    "mst_hex_lookup": mst_hex_lookup,
+                }
+                st.session_state["resources_loaded"] = True
+            except Exception as e:
+                st.error(f"❌ Gagal load model: {e}")
+                st.stop()
+    return st.session_state["resources"]
+
+
+def home_page(df_found):
+    st.markdown("""
+    <div class="hero">
+        <div class="pill">✧ Skin Tone Analysis ✧</div>
+        <div class="hero-title">Find Your Perfect <span class="pink">Foundation</span> <span class="green">Match</span></div>
+        <div class="subtitle">Analyze your skin tone and undertone to discover foundation shades that suit you.<br>Powered by computer vision and color science.</div>
+    </div>
+    """, unsafe_allow_html=True)
+    _, center, _ = st.columns([1.2, 1.1, 1.2])
+    with center:
+        cta1, cta2 = st.columns(2)
+        with cta1:
+            if st.button("Start Analysis →", type="primary", use_container_width=True):
+                st.session_state["page"] = "Skin Analysis"; st.rerun()
+        with cta2:
+            if st.button("Learn More", use_container_width=True):
+                st.session_state["page"] = "About Method"; st.rerun()
+    st.markdown("<div style='height:1.3rem;'></div>", unsafe_allow_html=True)
+    cols = st.columns(3)
+    cards = [("📷","Upload Photo","Upload a selfie or use your webcam for real-time skin tone analysis.","pink-tint"),("🎨","Skin Tone Analysis","AI extracts dominant skin color using K-Means clustering and LAB color space.","green-tint"),("✨","Foundation Match","Get personalized recommendations from foundation shades across available brands.","purple-tint")]
+    for col, (icon, title, text, tint) in zip(cols, cards):
+        with col:
+            st.markdown(f"""<div class="custom-card feature-card {tint}" style="text-align:center;"><div class="feature-icon" style="background:rgba(255,168,214,.28);margin:0 auto 1rem;display:flex;justify-content:center;align-items:center;">{icon}</div><h3>{title}</h3><p>{text}</p></div>""", unsafe_allow_html=True)
+    total_shades = len(df_found)
+    total_brands = df_found["Brand"].nunique() if "Brand" in df_found else 10
+    st.markdown(f"""<div class="custom-card stats-card"><div class="stats-grid"><div><div class="stat-number">{total_shades}+</div><div class="stat-label">Foundation Shades</div></div><div><div class="stat-number">{total_brands}</div><div class="stat-label">Brands Covered</div></div><div><div class="stat-number">10</div><div class="stat-label">Monk Skin Tones</div></div><div><div class="stat-number">98%</div><div class="stat-label">Analysis Accuracy</div></div></div></div>""", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align:center;margin-top:1.8rem;'>How It Works</h3>", unsafe_allow_html=True)
+    steps = [("01","⇧","Upload","Take or upload a photo in natural lighting.","#F48ABD"),("02","⌗","Analyze","AI detects face and extracts skin pixels.","#BADF93"),("03","✧","Match","Euclidean distance finds closest shades.","#F48ABD"),("04","▯","Discover","Browse curated foundation recommendations.","#BADF93")]
+    for col, (num, icon, title, desc, color) in zip(st.columns(4), steps):
+        with col:
+            icon_color = "#D94E91" if color == "#F48ABD" else "#758952"
+            st.markdown(f"""<div class="step-node"><div class="step-badge" style="background:{color};">{num}</div><div class="step-icon" style="background:{color}55;color:{icon_color};">{icon}</div><div class="step-title">{title}</div><div class="small-text" style="text-align:center;max-width:170px;">{desc}</div></div>""", unsafe_allow_html=True)
+
+
+
+def skin_analysis_page(resources):
+    st.markdown('<div class="pill">Step 1 of 3</div>', unsafe_allow_html=True)
+    st.markdown('<h1 class="page-title">Skin Analysis</h1>', unsafe_allow_html=True)
+    st.markdown('<div class="subtitle" style="margin:0;max-width:760px;">Upload your photo or use webcam to begin skin tone analysis.</div>', unsafe_allow_html=True)
+    mode = st.radio("Input mode", ["Upload Photo", "Camera Capture"], horizontal=True, label_visibility="collapsed")
+    left, right = st.columns([2.4, 1.1], gap="large")
+    image_source = None
+    with left:
+        if mode == "Upload Photo":
+            st.markdown('<div class="upload-real-card">', unsafe_allow_html=True)
+            uploaded = st.file_uploader("Drag & drop your photo here", type=["png", "jpg", "jpeg", "webp"], help="PNG, JPG, JPEG, atau WEBP", label_visibility="collapsed")
+            st.markdown('</div>', unsafe_allow_html=True)
+            if uploaded:
+                image_source = uploaded
+                st.image(uploaded, caption="Preview foto", use_container_width=True)
         else:
-            # =========================
-            # ROW 1: GAMBAR + PREDIKSI
-            # =========================
-            left_col, right_col = st.columns([1.15, 1.85], gap="large")
+            st.markdown("""
+            <div class="custom-card camera-intro-card">
+                <div class="upload-symbol" style="background:#D4EBC2;color:#758952;">▣</div>
+                <h3 style="font-family:Inter;margin:.1rem 0;">Camera Capture</h3>
+                <div class="small-text">Allow camera access and take a photo.</div>
+            </div>
+            """, unsafe_allow_html=True)
+            st.markdown('<div class="camera-real-card">', unsafe_allow_html=True)
+            cam = st.camera_input("Take Photo", help="Izinkan akses kamera di browser jika diminta")
+            st.markdown('</div>', unsafe_allow_html=True)
+            if cam:
+                image_source = cam
+                cam_bytes_preview = np.frombuffer(cam.getvalue(), dtype=np.uint8)
+                cam_bgr_preview = cv2.imdecode(cam_bytes_preview, cv2.IMREAD_COLOR)
+                if cam_bgr_preview is not None:
+                    cam_rgb_preview = cv2.cvtColor(cam_bgr_preview, cv2.COLOR_BGR2RGB)
+                    cam_rgb_preview = cv2.flip(cam_rgb_preview, 1)  # mengikuti logic app_backup: hasil kamera tidak mirror
+                    st.image(cam_rgb_preview, caption="Captured photo", use_container_width=True)
+                else:
+                    st.image(cam, caption="Captured photo", use_container_width=True)
+        if st.button("Analyze Now  →", type="primary", use_container_width=True):
+            if image_source is None:
+                st.warning("Upload atau ambil foto dulu ya.")
+            else:
+                file_bytes = np.frombuffer(image_source.getvalue(), dtype=np.uint8)
+                img_bgr = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+                if img_bgr is None:
+                    st.error("Gambar tidak bisa dibaca. Coba upload ulang dengan format JPG/PNG.")
+                    st.stop()
+                img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+                if mode == "Camera Capture":
+                    img_rgb = cv2.flip(img_rgb, 1)  # referensi app_backup: koreksi mirror dari st.camera_input
+                st.session_state["last_input_image"] = img_rgb.copy()
+                with st.spinner("Menganalisis wajah..."):
+                    result, error = run_pipeline(img_rgb, resources["face_mesh"], resources["ensemble"], resources["scaler"], resources["kmeans"], resources["centroids"], resources["df_found"], resources["mst_hex_lookup"], FEATURE_COLS)
+                if error:
+                    st.session_state["analysis_error"] = error
+                    st.warning(error)
+                else:
+                    st.session_state["analysis_result"] = result
+                    st.session_state["analysis_error"] = None
+                    st.session_state["page"] = "Results"
+                    st.rerun()
+    with right:
+        st.markdown("""
+        <div class="tip-card">
+            <h3 style="font-family:Inter;margin-top:0;">💡 Photo Tips</h3>
+            <div class="tip-item"><div class="tip-emoji">☀️</div><div><strong>Natural Lighting</strong><span class="small-text">Use daylight or soft indoor light. Avoid flash and harsh shadows.</span></div></div>
+            <div class="tip-item"><div class="tip-emoji">🚫</div><div><strong>No Filters</strong><span class="small-text">Upload the original photo without any color filters or edits.</span></div></div>
+            <div class="tip-item"><div class="tip-emoji">👤</div><div><strong>Face Visible</strong><span class="small-text">Your face should be clearly visible and centered in the frame.</span></div></div>
+            <div class="tip-item"><div class="tip-emoji">📐</div><div><strong>Straight Angle</strong><span class="small-text">Face the camera directly for best skin tone extraction.</span></div></div>
+            <div class="tip-item"><div class="tip-emoji">💄</div><div><strong>Minimal Makeup</strong><span class="small-text">Less makeup gives more accurate skin color readings.</span></div></div>
+        </div>
+        <div class="notice">🔒 <strong>Your privacy matters.</strong> Photos are processed locally and are not stored or shared.</div>
+        """, unsafe_allow_html=True)
 
-            with left_col:
-                st.markdown("### Frame + Landmark")
-                st.image(result["vis_frame"], width="stretch")
 
-            with right_col:
-                st.markdown("### Prediksi MST")
 
-                skin_hex = cielab_to_hex(
-                    result["cielab"]["L"],
-                    result["cielab"]["a"],
-                    result["cielab"]["b"]
-                )
+def results_page():
+    result = st.session_state.get("analysis_result")
+    if result is None:
+        st.info("Belum ada hasil analisis. Mulai dari halaman Skin Analysis dulu.")
+        if st.button("Go to Skin Analysis →", type="primary"):
+            st.session_state["page"] = "Skin Analysis"
+            st.rerun()
+        return
+    skin_hex = result.get("skin_hex", "#C4956A")
+    user_skintone = result.get("user_skintone", "-")
+    user_undertone = result.get("user_undertone", "-")
+    mst = int(result.get("mst_pred", 4))
+    confidence = float(result.get("confidence", 0))
+    lab = result.get("cielab", {"L": 0, "a": 0, "b": 0})
+    rgb_tuple = tuple(int(x) for x in ImageColor_get_rgb(skin_hex))
+    display_skintone = "Medium Beige" if str(user_skintone).lower() == "medium" else user_skintone
+    st.markdown('<span class="pill green">Step 2 of 3</span> <span class="pill green">✓ Analysis Complete</span>', unsafe_allow_html=True)
+    st.markdown('<h1 class="page-title">Analysis Results</h1>', unsafe_allow_html=True)
+    st.markdown('<div class="subtitle" style="margin:0 0 1.2rem;max-width:760px;">Here’s what we found from your photo.</div>', unsafe_allow_html=True)
+    main, side = st.columns([2.2, 1], gap="large")
+    with main:
+        cards = [("🌸 Skin Tone", display_skintone, "Fitzpatrick scale approximation", "#D94E91"), ("🍃 Undertone", user_undertone, "Golden–yellow hue bias detected" if user_undertone == "Warm" else "Estimated from CIELAB a* and b*", "#758952"), ("▥ MST Score", f"MST-{mst}", "Monk Skin Tone Scale", "#A66BCF"), ("✨ Confidence", f"{confidence}%", "Model prediction confidence", "#F28C43")]
+        for i in range(0,4,2):
+            cols = st.columns(2)
+            for col, (label, value, sub, color) in zip(cols, cards[i:i+2]):
+                with col:
+                    st.markdown(f'<div class="metric-card" style="margin-bottom:1rem;"><div class="metric-label" style="color:{color};">{label}</div><div class="metric-value">{value}</div><div class="small-text">{sub}</div></div>', unsafe_allow_html=True)
+        mst_items = ""
+        for i, color in MST_COLORS.items():
+            match = "match" if i == mst else ""
+            bubble = '<div class="match-label">Your Match</div>' if i == mst else ""
+            label_color = "#F48ABD" if i == mst else "#7B6472"
+            weight = "900" if i == mst else "700"
+            mst_items += f'<div class="mst-item {match}">{bubble}<div class="mst-color" style="background:{color};"></div><div style="font-size:.78rem;margin-top:.45rem;color:{label_color};font-weight:{weight};">MST-{i}</div></div>'
+        st.markdown(f'<div class="custom-card" style="padding:1.6rem;margin-top:.1rem;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;"><strong>Prediction Confidence</strong><strong style="color:#F48ABD;font-size:1.25rem;">{confidence}%</strong></div><div class="progress-track"><div class="progress-fill pink" style="width:{confidence}%;"></div></div><div style="display:flex;justify-content:space-between;color:#7B6472;font-size:.8rem;margin-top:.45rem;"><span>0%</span><span>100%</span></div><div style="margin-top:1.5rem;margin-bottom:.75rem;color:#7B6472;">Monk Skin Tone Scale</div><div class="mst-strip">{mst_items}</div><div style="text-align:center;color:#F48ABD;font-weight:900;margin-top:.9rem;">←──── MST-{mst} (Your Tone) ────→</div></div>', unsafe_allow_html=True)
+        st.markdown(f"""<div class="custom-card" style="padding:1.4rem;margin-top:1rem;"><strong>Color Space Analysis</strong><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.9rem;margin-top:1rem;"><div class="pink-tint" style="border-radius:.9rem;padding:1rem;"><div class="metric-label">HEX</div><div class="small-text">Detected</div><strong style="float:right;">{skin_hex}</strong></div><div class="pink-tint" style="border-radius:.9rem;padding:1rem;"><div class="metric-label">RGB</div><div>R <strong style="float:right;">{rgb_tuple[0]}</strong></div><div>G <strong style="float:right;">{rgb_tuple[1]}</strong></div><div>B <strong style="float:right;">{rgb_tuple[2]}</strong></div></div><div class="pink-tint" style="border-radius:.9rem;padding:1rem;"><div class="metric-label">LAB</div><div>L* <strong style="float:right;">{lab.get('L')}</strong></div><div>a* <strong style="float:right;">{lab.get('a')}</strong></div><div>b* <strong style="float:right;">{lab.get('b')}</strong></div></div></div></div>""", unsafe_allow_html=True)
+        if st.button("View Foundation Recommendations  →", type="primary", use_container_width=True):
+            st.session_state["page"] = "Recommendations"
+            st.rerun()
+    with side:
+        with st.container(border=True):
+            st.markdown('<strong>Preview Photo</strong>', unsafe_allow_html=True)
+            preview = st.session_state.get("last_input_image", result.get("vis_frame", None))
+            if preview is not None:
+                st.markdown('<div class="analysis-preview-img" style="margin:.9rem 0;">', unsafe_allow_html=True)
+                st.image(preview, use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown(f'<strong>Detected Skin Color</strong><div class="swatch" style="height:92px;background:{skin_hex};margin:1rem 0;"></div><div style="text-align:center;"><span class="pill" style="letter-spacing:0;text-transform:none;">{skin_hex}</span><div class="small-text" style="margin-top:.5rem;">{display_skintone}</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="custom-card" style="padding:1.35rem;margin-top:1rem;"><strong>ⓘ About Your Result</strong><div class="pink-tint" style="border-radius:.9rem;padding:1rem;margin-top:1rem;"><strong style="color:#F48ABD;">{user_undertone} Undertone</strong><div class="small-text">Foundation shades with matching undertone labels will complement your detected skin color better.</div></div><div class="green-tint" style="border-radius:.9rem;padding:1rem;margin-top:.75rem;"><strong style="color:#758952;">Best Finishes</strong><div class="small-text">Dewy and satin finishes often enhance the result with a natural radiance.</div></div></div>', unsafe_allow_html=True)
+        if st.button("📷 Re-analyze Photo", use_container_width=True):
+            st.session_state["page"] = "Skin Analysis"
+            st.rerun()
 
-                pred_left, pred_right = st.columns([1.12, 1], gap="medium")
 
-                # =========================
-                # KIRI: WARNA KULIT + FOUNDATION
-                # =========================
-            with pred_left:
-                st.markdown(
-                    f"""
-                    <div style="font-size:17px;font-weight:700;margin-bottom:6px;color:inherit;">
-                        Warna Kulit Terdeteksi
-                    </div>
 
-                    <div style="
-                        display:flex;
-                        align-items:center;
-                        gap:12px;
-                        margin-bottom:18px;">
-                        <div style="
-                            background:{skin_hex};
-                            border-radius:8px;
-                            height:38px;
-                            width:58%;
-                            border:1px solid rgba(128,128,128,0.4);">
-                        </div>
-                        <div style="
-                            font-size:17px;
-                            font-weight:700;
-                            color:inherit;">
-                            {skin_hex}
-                        </div>
-                    </div>
+def recommendations_page():
+    result = st.session_state.get("analysis_result")
+    if result is None:
+        st.info("Belum ada hasil rekomendasi. Jalankan analisis dulu.")
+        if st.button("Go to Skin Analysis →", type="primary"):
+            st.session_state["page"] = "Skin Analysis"
+            st.rerun()
+        return
+    recs = pd.DataFrame(result.get("top5_recs", []))
+    if recs.empty:
+        st.warning("Tidak ada rekomendasi foundation yang tersedia.")
+        return
+    skin_hex = result.get("skin_hex", "#C4956A")
+    mst_pred = result.get("mst_pred", "-")
+    display_skintone = result.get("user_skintone", "-")
+    if str(display_skintone).lower() == "medium": display_skintone = "Medium Beige"
+    st.markdown('<div class="pill">Step 3 of 3</div>', unsafe_allow_html=True)
+    st.markdown('<h1 class="page-title">Foundation Recommendations</h1>', unsafe_allow_html=True)
+    st.markdown('<div class="subtitle" style="margin:0 0 1.1rem;max-width:760px;">Showing shades matched to your skin tone • Sorted by similarity</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="custom-card" style="padding:1.2rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1rem;"><div style="display:flex;align-items:center;gap:1rem;"><div class="swatch" style="background:{skin_hex};width:64px;height:64px;"></div><div><div class="small-text">Your detected skin color</div><div style="font-weight:900;font-size:1.15rem;">{display_skintone} · {result.get("user_undertone","-")} Undertone · MST-{mst_pred}</div><div class="small-text">{skin_hex}</div></div></div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="filters-header-box"><strong style="font-size:1.05rem;">Filters</strong></div>', unsafe_allow_html=True)
+    st.markdown('<div class="filters-shell">', unsafe_allow_html=True)
+    brand_options = ["All"] + sorted(recs["Brand"].dropna().astype(str).unique().tolist())
+    st.markdown('<div class="filter-group"><div class="filter-group-title">Brand</div></div>', unsafe_allow_html=True)
+    brand_filter = st.radio("Brand", brand_options, horizontal=True, key="rec_brand_filter", label_visibility="collapsed")
+    undertone_options = ["All"] + sorted(recs["Undertone"].dropna().astype(str).unique().tolist()) if "Undertone" in recs else ["All"]
+    st.markdown('<div class="filter-group"><div class="filter-group-title">Undertone</div></div>', unsafe_allow_html=True)
+    undertone_filter = st.radio("Undertone", undertone_options, horizontal=True, key="rec_undertone_filter", label_visibility="collapsed")
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('<div style="height:1rem;"></div>', unsafe_allow_html=True)
+    filtered = recs.copy()
+    if brand_filter != "All": filtered = filtered[filtered["Brand"].astype(str).eq(brand_filter)]
+    if undertone_filter != "All" and "Undertone" in filtered: filtered = filtered[filtered["Undertone"].astype(str).eq(undertone_filter)]
+    if "delta_e" not in filtered: filtered["delta_e"] = 6
+    filtered["similarity"] = filtered["delta_e"].apply(safe_similarity)
+    cols = st.columns(2, gap="large")
+    for idx, (_, row) in enumerate(filtered.head(6).iterrows()):
+        brand, product, shade = str(row.get("Brand","-")), str(row.get("Product","-")), str(row.get("Shade","-"))
+        undertone = str(row.get("Undertone","-")); skintone = str(row.get("Skin tone", row.get("skintone_norm", "-")))
+        price = format_rupiah(row.get("Price", "-"))
+        hex_color = cielab_to_hex(row.get("lab_L",65), row.get("lab_a",10), row.get("lab_b",20))
+        sim = float(row.get("similarity",88))
+        img_path = product_image_path(brand, shade)
+        img_src = encode_image_for_html(img_path) if img_path else ""
+        ml = "25 ml" if brand.lower() == "omg" else "30 ml"
+        img_tag = ("<img class='html-product-img' src='" + img_src + "'/>" if img_src else "<div class='html-product-img'></div>")
+        html_card = f"""<div class="html-product-card"><div class="html-product-top"><div>{img_tag}</div><div><div class="html-brand">{ehtml(brand)}</div><div class="html-name">{ehtml(product)} - {ehtml(shade)}</div><div style="display:flex;align-items:center;gap:.55rem;"><div class="swatch" style="width:34px;height:28px;background:{hex_color};"></div><span class="small-text">{hex_color}</span></div><div style="margin-top:.6rem;"><span class="chip">{ehtml(undertone)}</span> <span class="chip">{ehtml(skintone)}</span></div></div><div class="html-price"><div>{ehtml(price)}</div><div class="small-text">{ml}</div><div style="margin-top:.6rem;" class="match-badge">▲ {sim:.1f}% match</div></div></div><div style="display:flex;justify-content:space-between;"><span class="small-text">Match Score</span><strong>{sim:.1f}%</strong></div><div class="html-bar"><div style="width:{sim:.1f}%;"></div></div></div>"""
+        with cols[idx % 2]: st.markdown(html_card, unsafe_allow_html=True)
+    report_img = create_analysis_report(result)
+    buffer = BytesIO(); report_img.save(buffer, format="PNG"); buffer.seek(0)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    st.download_button(label="📥 Download Hasil Analisis", data=buffer, file_name=f"hasil_analisis_foundation_{timestamp}.png", mime="image/png", use_container_width=True)
 
-                    <div style="font-size:17px;font-weight:700;margin-bottom:6px;color:inherit;">
-                        Foundation Cocok
-                    </div>
 
-                    <div style="
-                        display:flex;
-                        align-items:center;
-                        gap:12px;">
-                        <div style="
-                            background:{result["hex_color"]};
-                            border-radius:8px;
-                            height:44px;
-                            width:58%;
-                            border:1px solid rgba(128,128,128,0.4);">
-                        </div>
-                        <div style="
-                            font-size:17px;
-                            font-weight:700;
-                            color:inherit;">
-                            {result["hex_color"]}
-                        </div>
-                    </div>
 
-                    <div style="
-                        margin-top:14px;
-                        font-size:20px;
-                        font-weight:750;
-                        color:inherit;">
-                        Undertone: {result["user_undertone"]} | Skintone: {result["user_skintone"]}
-                    </div>
+def about_method_page():
+    st.markdown('<div class="pill green">Methodology</div>', unsafe_allow_html=True)
+    st.markdown('<h1 class="page-title">About the Method</h1>', unsafe_allow_html=True)
+    st.markdown('<div class="subtitle" style="margin:0 0 1.3rem;max-width:760px;">ShadeMate uses a computer vision pipeline to analyze facial skin color and match it to foundation shades using color science.</div>', unsafe_allow_html=True)
+    steps = [("1","⇧","Input","Upload Image","#FFA8D6"),("2","⌗","Detection","Face Detection","#C58CE0"),("3","▰","Segmentation","Skin Area<br>Extraction","#FF9A57"),("4","↻","Transform","RGB → LAB<br>Conversion","#66B4E8"),("5","▦","Clustering","K-Means<br>Clustering","#758952"),("6","⌘","Matching","Euclidean Distance<br>Matching","#F48ABD")]
+    pipeline_html = '<div class="custom-card pipeline-card"><h3 style="font-family:Inter;margin-top:0;">Processing Pipeline</h3><div class="method-timeline">'
+    for num, icon, tag, title, color in steps:
+        pipeline_html += f'<div class="method-step"><div class="step-badge" style="background:{color};">{num}</div><div class="method-icon" style="background:{color}22;color:{color};">{icon}</div><div class="chip active" style="background:{color}22;color:{color};border-color:{color}33;">{tag}</div><div class="method-title">{title}</div></div>'
+    pipeline_html += '</div></div>'
+    st.markdown(pipeline_html, unsafe_allow_html=True)
+    st.markdown('<div style="height:1.1rem;"></div>', unsafe_allow_html=True)
+    method_cards = [("STEP 1","Upload Image","Input Layer","User provides a facial photograph via file upload or webcam capture. Accepted formats include PNG and JPG.","Resolution ≥ 480×480px recommended for accurate face detection.","#FFA8D6","⇧"),("STEP 2","Face Detection","Computer Vision","MediaPipe Face Landmarker detects the face landmarks within the image frame.","Model: face_landmarker.task with confidence threshold 0.3","#C58CE0","⌗"),("STEP 3","Skin Area Extraction","Segmentation","Within the detected face region, cheek, forehead, and nose skin areas are isolated with landmark-based masks.","Skin-like LAB pixels are filtered before feature extraction.","#FF9A57","▰"),("STEP 4","RGB → LAB Conversion","Color Science","Skin pixels are converted from RGB to the CIELAB color space. LAB is perceptually uniform for color difference comparison.","Using D65 illuminant. L*: lightness, a*: green-red axis, b*: blue-yellow axis.","#66B4E8","↻"),("STEP 5","K-Means Clustering","Machine Learning","K-Means features and scaled LAB statistics support the model in predicting the closest Monk Skin Tone.","kmeans_k*.pkl + scaler.pkl + best_model.pkl","#758952","▦"),("STEP 6","Euclidean Distance Matching","Recommendation Engine","The dominant LAB color is compared to foundation shade LAB values. The Euclidean distance (ΔE) determines similarity.","ΔE = √[(ΔL*)² + (Δa*)² + (Δb*)²] — lower ΔE means closer match.","#F48ABD","⌘")]
+    for i in range(0,6,3):
+        st.markdown('<div class="method-cards-row">', unsafe_allow_html=True)
+        cols=st.columns(3,gap="large")
+        for col,(step,title,tag,desc,note,color,icon) in zip(cols,method_cards[i:i+3]):
+            with col:
+                st.markdown(f'<div class="custom-card method-card" style="border-color:{color}66;"><div style="display:flex;align-items:center;gap:.9rem;"><div class="method-icon" style="background:{color}22;color:{color};margin:0;">{icon}</div><div><div class="metric-label" style="color:{color};">{step}</div><div style="font-weight:900;font-size:1.05rem;">{title}</div></div></div><div class="chip" style="margin-top:1rem;background:{color}18;color:{color};border-color:{color}33;">{tag}</div><div class="small-text" style="margin-top:.9rem;">{desc}</div><div class="code-note" style="background:{color}12;border:1px solid {color}55;color:{color};">{note}</div></div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('<div class="custom-card tech-stack-box"><h3 style="font-family:Inter;margin-top:0;">Technology Stack</h3>', unsafe_allow_html=True)
+    techs=[("🐍","Python","Core Language","#66B4E8"),("👑","Streamlit","Frontend Framework","#F48ABD"),("🔶","OpenCV","Computer Vision","#FF9A57"),("🌿","scikit-learn","Machine Learning","#758952"),("🧊","NumPy","Numeric Computing","#A66BCF"),("📊","Pandas","Data Processing","#66B4E8"),("💧","CIELAB ΔE","Color Space & Metric","#FF9A57"),("✣","K-Means","Clustering Algorithm","#758952")]
+    for i in range(0,8,4):
+        cols=st.columns(4, gap="medium")
+        for col,(icon,name,desc,color) in zip(cols,techs[i:i+4]):
+            with col: st.markdown(f'<div class="tech-card compact"><div class="tech-icon compact" style="background:{color}18;color:{color};">{icon}</div><div><strong>{name}</strong><div class="small-text">{desc}</div></div></div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('<div class="ref-box" style="margin-top:1.25rem;"><strong>References</strong><div class="small-text" style="margin-top:1rem;line-height:2;"><span style="color:#F48ABD;font-weight:900;">[1]</span> Monk, D. S. (2019). Monk Skin Tone Scale. Google Research.<br><span style="color:#F48ABD;font-weight:900;">[2]</span> CIE (2004). Colorimetry, 3rd ed. — CIELAB color model specification.<br><span style="color:#F48ABD;font-weight:900;">[3]</span> MacAdam, D. L. (1942). Visual Sensitivities to Color Differences. JOSA.<br><span style="color:#F48ABD;font-weight:900;">[4]</span> MediaPipe Face Landmarker documentation.<br><span style="color:#F48ABD;font-weight:900;">[5]</span> scikit-learn documentation for K-Means and ensemble modeling.</div></div>', unsafe_allow_html=True)
 
-                    """,
-                    unsafe_allow_html=True
-                )
 
-                # =========================
-                # KANAN: MST + TOP 3
-                # =========================
-                with pred_right:
-                    conf_pct = result["confidence"]
-                    bar_color = "#2e8b57" if conf_pct >= 60 else "#e07b39" if conf_pct >= 40 else "#cc2222"
-
-                    st.markdown(
-                        f"""
-                        <div style="
-                            background:rgba(128,128,128,0.12);
-                            border-radius:12px;
-                            padding:15px 12px;
-                            text-align:center;
-                            border:1px solid rgba(128,128,128,0.25);
-                            margin-bottom:6px;">
-                            <div style="
-                                font-size:38px;
-                                font-weight:800;
-                                line-height:1;
-                                color:inherit;">
-                                MST {result["mst_pred"]}
-                            </div>
-                            <div style="
-                                font-size:17px;
-                                color:inherit;
-                                opacity:0.7;
-                                margin-top:5px;">
-                                Confidence: {result["confidence"]}%
-                            </div>
-                        </div>
-
-                        <div style="
-                            background:rgba(128,128,128,0.2);
-                            border-radius:999px;
-                            height:6px;
-                            overflow:hidden;
-                            margin-bottom:8px;">
-                            <div style="
-                                background:{bar_color};
-                                width:{conf_pct}%;
-                                height:100%;
-                                border-radius:999px;">
-                            </div>
-                        </div>
-
-                        <div style="
-                            font-size:17px;
-                            font-weight:700;
-                            margin-bottom:4px;
-                            color:inherit;">
-                            Top 3 Alternatif MST
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
-
-                    for t in result["top3"]:
-                        hex_c = t["hex"]
-                        st.markdown(
-                            f"""
-                            <div style="
-                                display:flex;
-                                align-items:center;
-                                gap:7px;
-                                margin:3px 0;">
-                                <div style="
-                                    background:{hex_c};
-                                    width:30px;
-                                    height:30px;
-                                    border-radius:5px;
-                                    border:1px solid rgba(128,128,128,0.4);
-                                    flex-shrink:0;">
-                                </div>
-                                <span style="font-size:17px;color:inherit;">
-                                    MST {t["mst"]} — {t["conf"]}%
-                                </span>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-
-                # =========================
-                # CIELAB COMPACT
-                # =========================
-                st.markdown(
-                    f"""
-                    <div style="
-                        margin-top:12px;
-                        padding-top:10px;
-                        border-top:1px solid rgba(128,128,128,0.3);">
-                        <div style="
-                            font-size:23px;
-                            font-weight:800;
-                            margin-bottom:8px;
-                            color:inherit;">
-                            Nilai CIELAB Kulit
-                        </div>
-                        <div style="
-                            display:grid;
-                            grid-template-columns:repeat(3, 1fr);
-                            gap:10px;">
-                            <div>
-                                <div style="font-size:15px;opacity:0.6;color:inherit;">L* (kecerahan)</div>
-                                <div style="font-size:24px;font-weight:500;line-height:1.1;color:inherit;">
-                                    {result["cielab"]["L"]}
-                                </div>
-                            </div>
-                            <div>
-                                <div style="font-size:15px;opacity:0.6;color:inherit;">a* (merah-hijau)</div>
-                                <div style="font-size:24px;font-weight:500;line-height:1.1;color:inherit;">
-                                    {result["cielab"]["a"]}
-                                </div>
-                            </div>
-                            <div>
-                                <div style="font-size:15px;opacity:0.6;color:inherit;">b* (kuning-biru)</div>
-                                <div style="font-size:24px;font-weight:500;line-height:1.1;color:inherit;">
-                                    {result["cielab"]["b"]}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-            st.markdown("---")
-
-            # ==========================================
-            # ROW 2: REKOMENDASI UTAMA + TOP 5 PRODUK
-            # ==========================================
-            rec_col, top5_col = st.columns([1.1, 1.6], gap="large")
-
-            with rec_col:
-                st.markdown("### Rekomendasi Foundation")
-
-                st.markdown(f"""
-                | Info | Detail |
-                |------|--------|
-                | 🏷️ Brand | **{result['brand']}** |
-                | 💄 Produk | {result['product']} |
-                | 🎨 Shade | **{result['shade_name']}** |
-                | 🌡️ Undertone | {result['undertone']} |
-                | 💰 Price | {result['price']} |
-                """)
-
-            with top5_col:
-                st.markdown("### Top-5 Rekomendasi Foundation")
-
-                df_recs = pd.DataFrame(result["top5_recs"])[
-                    ["Brand", "Product", "Shade", "Undertone", "Price"]
-                ]
-
-                df_recs["Price"] = df_recs["Price"].apply(format_rupiah)
-
-                st.dataframe(
-                    df_recs,
-                    width="stretch",
-                    hide_index=True
-                )
-
-                report_img = create_analysis_report(result)
-
-                buffer = BytesIO()
-                report_img.save(buffer, format="PNG")
-                buffer.seek(0)
-
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-                st.download_button(
-                    label="📥 Download Hasil Analisis",
-                    data=buffer,
-                    file_name=f"hasil_analisis_foundation_{timestamp}.png",
-                    mime="image/png",
-                    use_container_width=True
-                )
-
-            st.caption(f"⏱️ Waktu analisis: {result['latency_ms']} ms")
+def main():
+    st.set_page_config(page_title="ShadeMate", page_icon="🌸", layout="wide", initial_sidebar_state="expanded")
+    load_css()
+    inject_ui_hotfix_css()
+    if "page" not in st.session_state:
+        st.session_state["page"] = "Home"
+    resources = get_resources_or_stop()
+    page = render_sidebar()
+    if page == "Home": home_page(resources["df_found"])
+    elif page == "Skin Analysis": skin_analysis_page(resources)
+    elif page == "Results": results_page()
+    elif page == "Recommendations": recommendations_page()
+    elif page == "About Method": about_method_page()
 
 
 if __name__ == "__main__":
