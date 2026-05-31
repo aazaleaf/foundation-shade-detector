@@ -896,6 +896,10 @@ def create_analysis_report(result, dark_mode=True):
     font_lab_label = _load_font(15, bold=True)
     font_lab_value = _load_font(15, bold=True)
     font_hex = _load_font(20, bold=True)
+    font_rec_label = _load_font(20, bold=True)
+    font_rec_value = _load_font(22)
+    font_top5_title = _load_font(19, bold=True)
+    font_top5_meta = _load_font(16)
 
     margin = 50
     header_y1, header_y2 = 35, 155
@@ -918,8 +922,8 @@ def create_analysis_report(result, dark_mode=True):
 
     ry2 = ry1 + 540
     by = max(left_y2, ry2) + 40
-    bottom_y2 = by + 500
-    H = bottom_y2 + 70
+    bottom_y2 = by + 620
+    H = bottom_y2 + 90
 
     img = Image.new("RGB", (W, H), bg)
     draw = ImageDraw.Draw(img)
@@ -1008,23 +1012,62 @@ def create_analysis_report(result, dark_mode=True):
         draw.rounded_rectangle((rx1 + 28, cy, rx1 + 56, cy + 20), radius=8, fill=swatch, outline=soft_outline, width=1)
         draw.text((rx1 + 68, cy), f"{label} • {score:.1f}%", font=font_small, fill=text_dark)
 
+    def _load_product_thumb(brand_name, shade_name, target_w, target_h):
+        img_path = product_image_path(brand_name, shade_name)
+        if not img_path:
+            return None
+        try:
+            pimg = Image.open(img_path).convert("RGBA")
+            scale = min(target_w / max(1, pimg.width), target_h / max(1, pimg.height))
+            new_w = max(1, int(pimg.width * scale))
+            new_h = max(1, int(pimg.height * scale))
+            pimg = pimg.resize((new_w, new_h), Image.LANCZOS)
+            canvas = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
+            off_x = (target_w - new_w) // 2
+            off_y = (target_h - new_h) // 2
+            canvas.paste(pimg, (off_x, off_y), pimg)
+            return canvas
+        except Exception:
+            return None
+
     left_bottom = (margin, by, 760, bottom_y2)
     right_bottom = (800, by, W - margin, bottom_y2)
     _draw_card(draw, left_bottom, fill=card_fill, outline=border, radius=26)
     _draw_card(draw, right_bottom, fill=card_fill, outline=border, radius=26)
 
-    draw.text((margin + 28, by + 24), "Main Recommendation", font=font_h2, fill=text_dark)
-    draw.line((margin + 28, by + 72, 760 - 28, by + 72), fill=line, width=2)
-    info_x, info_y = margin + 28, by + 104
-    for label, value in [("Brand", brand), ("Product", product), ("Shade", shade), ("Undertone", rec_undertone), ("Price", price)]:
-        draw.text((info_x, info_y), str(label), font=font_label, fill=text_muted)
-        _draw_text_block(draw, info_x + 145, info_y, value, font_text, text_dark, 760 - info_x - 190, line_gap=6, max_lines=2)
-        info_y += 74
+    # Main recommendation with larger text and product image on the right
+    lx1, ly1, lx2, ly2 = left_bottom
+    draw.text((lx1 + 28, ly1 + 24), "Main Recommendation", font=font_h2, fill=text_dark)
+    draw.line((lx1 + 28, ly1 + 72, lx2 - 28, ly1 + 72), fill=line, width=2)
 
-    draw.text((800 + 28, by + 24), "Top 5 Recommendations", font=font_h2, fill=text_dark)
-    draw.line((800 + 28, by + 72, W - margin - 28, by + 72), fill=line, width=2)
-    row_x1, row_x2 = 828, W - margin - 28
-    row_y, row_h, row_gap = by + 92, 70, 8
+    image_box_w, image_box_h = 190, 240
+    image_box_x1 = lx2 - 28 - image_box_w
+    image_box_y1 = ly1 + 120
+    image_box_x2 = image_box_x1 + image_box_w
+    image_box_y2 = image_box_y1 + image_box_h
+    draw.rounded_rectangle((image_box_x1, image_box_y1, image_box_x2, image_box_y2), radius=18, fill=row_fill, outline=soft_outline, width=1)
+
+    main_thumb = _load_product_thumb(brand, shade, image_box_w - 22, image_box_h - 22)
+    if main_thumb is not None:
+        img.paste(main_thumb, (image_box_x1 + 11, image_box_y1 + 11), main_thumb)
+    else:
+        draw.text((image_box_x1 + 34, image_box_y1 + image_box_h // 2 - 10), "No image", font=font_small, fill=text_muted)
+
+    info_x, info_y = lx1 + 28, ly1 + 104
+    value_x = info_x + 150
+    value_w = image_box_x1 - value_x - 20
+    main_items = [("Brand", brand), ("Product", product), ("Shade", shade), ("Undertone", rec_undertone), ("Price", price)]
+    for label, value in main_items:
+        draw.text((info_x, info_y), str(label), font=font_rec_label, fill=text_muted)
+        info_y = _draw_text_block(draw, value_x, info_y, value, font_rec_value, text_dark, value_w, line_gap=8, max_lines=2)
+        info_y += 24
+
+    # Top 5 recommendations with index, product image, text, and swatch
+    rx1b, ry1b, rx2b, ry2b = right_bottom
+    draw.text((rx1b + 28, ry1b + 24), "Top 5 Recommendations", font=font_h2, fill=text_dark)
+    draw.line((rx1b + 28, ry1b + 72, rx2b - 28, ry1b + 72), fill=line, width=2)
+    row_x1, row_x2 = rx1b + 28, rx2b - 28
+    row_y, row_h, row_gap = ry1b + 92, 88, 10
     for idx, rec in enumerate(top5[:5], start=1):
         brand_i = str(rec.get("Brand", "-"))
         product_i = str(rec.get("Product", "-"))
@@ -1036,24 +1079,33 @@ def create_analysis_report(result, dark_mode=True):
         y2 = y1 + row_h
         draw.rounded_rectangle((row_x1, y1, row_x2, y2), radius=16, fill=row_fill, outline=soft_outline, width=1)
 
-        badge_x1, badge_y1 = row_x1 + 14, y1 + 20
-        draw.rounded_rectangle((badge_x1, badge_y1, badge_x1 + 28, badge_y1 + 28), radius=10, fill=badge_fill, outline=soft_outline, width=1)
+        badge_size = 32
+        badge_x1, badge_y1 = row_x1 + 12, y1 + (row_h - badge_size) // 2
+        draw.rounded_rectangle((badge_x1, badge_y1, badge_x1 + badge_size, badge_y1 + badge_size), radius=10, fill=badge_fill, outline=soft_outline, width=1)
         num = str(idx)
-        nb = draw.textbbox((0, 0), num, font=font_tiny)
-        draw.text((badge_x1 + (28 - (nb[2] - nb[0])) // 2, badge_y1 + (28 - (nb[3] - nb[1])) // 2 - 1), num, font=font_tiny, fill="#D94E91")
+        nb = draw.textbbox((0, 0), num, font=font_small)
+        draw.text((badge_x1 + (badge_size - (nb[2] - nb[0])) // 2, badge_y1 + (badge_size - (nb[3] - nb[1])) // 2 - 1), num, font=font_small, fill="#D94E91")
+
+        thumb_size = 52
+        thumb_x1 = badge_x1 + badge_size + 12
+        thumb_y1 = y1 + (row_h - thumb_size) // 2
+        draw.rounded_rectangle((thumb_x1, thumb_y1, thumb_x1 + thumb_size, thumb_y1 + thumb_size), radius=12, fill=frame_fill, outline=soft_outline, width=1)
+        thumb = _load_product_thumb(brand_i, shade_i, thumb_size - 8, thumb_size - 8)
+        if thumb is not None:
+            img.paste(thumb, (thumb_x1 + 4, thumb_y1 + 4), thumb)
 
         sw_size = 38
-        sw_x1, sw_y1 = row_x2 - 60, y1 + 16
+        sw_x1, sw_y1 = row_x2 - 52, y1 + (row_h - sw_size) // 2
         draw.rounded_rectangle((sw_x1, sw_y1, sw_x1 + sw_size, sw_y1 + sw_size), radius=12, fill=swatch_hex, outline=soft_outline, width=1)
 
-        text_x = badge_x1 + 40
+        text_x = thumb_x1 + thumb_size + 14
         text_max_w = sw_x1 - 16 - text_x
-        title = _fit_text(draw, f"{brand_i} • {shade_i}", font_text, text_max_w)
-        product_line = _fit_text(draw, product_i, font_tiny, text_max_w)
-        meta = _fit_text(draw, f"{undertone_i} • {price_i}", font_tiny, text_max_w)
-        draw.text((text_x, y1 + 8), title, font=font_text, fill=text_dark)
-        draw.text((text_x, y1 + 31), product_line, font=font_tiny, fill=product_muted)
-        draw.text((text_x, y1 + 49), meta, font=font_tiny, fill=text_muted)
+        title = _fit_text(draw, f"{brand_i} • {shade_i}", font_top5_title, text_max_w)
+        product_line = _fit_text(draw, product_i, font_top5_meta, text_max_w)
+        meta = _fit_text(draw, f"{undertone_i} • {price_i}", font_top5_meta, text_max_w)
+        draw.text((text_x, y1 + 10), title, font=font_top5_title, fill=text_dark)
+        draw.text((text_x, y1 + 35), product_line, font=font_top5_meta, fill=product_muted)
+        draw.text((text_x, y1 + 57), meta, font=font_top5_meta, fill=text_muted)
 
     draw.text((margin + 4, H - 42), "Generated by ShadeMate", font=font_small, fill=footer_muted)
     draw.text((W - 320, H - 42), datetime.now().strftime("%Y-%m-%d %H:%M:%S"), font=font_small, fill=footer_muted)
@@ -1818,7 +1870,7 @@ def results_page():
     with side:
         with st.container(border=True):
             st.markdown('<strong>Preview Photo</strong>', unsafe_allow_html=True)
-            preview = st.session_state.get("last_input_image", result.get("vis_frame", None))
+            preview = result.get("vis_frame", st.session_state.get("last_input_image", None))
             if preview is not None:
                 st.markdown('<div class="analysis-preview-img" style="margin:.55rem 0 .75rem;">', unsafe_allow_html=True)
                 st.image(preview, use_container_width=True)
