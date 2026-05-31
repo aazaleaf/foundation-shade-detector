@@ -814,7 +814,7 @@ def _get_alt_mst(result, confidence):
     return alts
 
 
-def create_analysis_report(result):
+def create_analysis_report(result, dark_mode=True):
     mst = result.get("mst_pred", "-")
     confidence = float(result.get("confidence", result.get("mst_confidence", 0) or 0))
     skin_hex = result.get("skin_hex", "#B2806F")
@@ -836,18 +836,52 @@ def create_analysis_report(result):
     report_img = _extract_report_image(result)
 
     W = 1600
-    bg = "#FCF7FA"
-    card_fill = "#FFFFFF"
-    border = "#EBCFDB"
-    text_dark = "#2F2330"
-    text_muted = "#7A6674"
-    pink = "#F48ABD"
-    pink_soft = "#FFF0F6"
-    green = "#758952"
-    green_soft = "#EEF3E5"
-    blue = "#66B4E8"
-    orange = "#FF9A57"
-    line = "#E9D7E0"
+    if dark_mode:
+        bg = "#1E171D"
+        card_fill = "#2D222B"
+        border = "#A65782"
+        text_dark = "#F8EEF4"
+        text_muted = "#D8C5D0"
+        pink = "#FF9ED0"
+        pink_soft = "#543247"
+        green = "#C8DDA5"
+        green_soft = "#33402B"
+        blue = "#8DCCF5"
+        orange = "#FFB07A"
+        line = "#5E4454"
+        frame_fill = "#372935"
+        soft_outline = "#7A4A62"
+        mst_fill = "#3A2935"
+        row_fill = "#3A2935"
+        badge_fill = "#5A3048"
+        lab_blue_fill = "#263645"
+        lab_pink_fill = "#4A2B3C"
+        lab_orange_fill = "#4A3428"
+        product_muted = "#CDB7C5"
+        footer_muted = "#B99AAA"
+    else:
+        bg = "#FCF7FA"
+        card_fill = "#FFFFFF"
+        border = "#EBCFDB"
+        text_dark = "#2F2330"
+        text_muted = "#7A6674"
+        pink = "#F48ABD"
+        pink_soft = "#FFF0F6"
+        green = "#758952"
+        green_soft = "#EEF3E5"
+        blue = "#66B4E8"
+        orange = "#FF9A57"
+        line = "#E9D7E0"
+        frame_fill = "#FAF6F8"
+        soft_outline = "#E9D7E0"
+        mst_fill = "#FFF9FC"
+        row_fill = "#FFF9FC"
+        badge_fill = "#FCE8F1"
+        lab_blue_fill = "#EEF6FF"
+        lab_pink_fill = "#FFF1F1"
+        lab_orange_fill = "#FFF6EB"
+        product_muted = "#8A7682"
+        footer_muted = "#A18897"
 
     font_title = _load_font(42, bold=True)
     font_sub = _load_font(20)
@@ -905,11 +939,11 @@ def create_analysis_report(result):
         fx1 = left_x1 + ((left_x2 - left_x1) - frame_w) // 2
         fy1 = left_y1 + 86
         fx2, fy2 = fx1 + frame_w, fy1 + frame_h
-        draw.rounded_rectangle((fx1, fy1, fx2, fy2), radius=16, fill="#FAF6F8", outline="#E9D7E0", width=2)
+        draw.rounded_rectangle((fx1, fy1, fx2, fy2), radius=16, fill=frame_fill, outline=soft_outline, width=2)
         img.paste(preview, (fx1 + 10, fy1 + 10))
     else:
         box_x1, box_y1, box_x2, box_y2 = left_x1 + 40, left_y1 + 100, left_x2 - 40, left_y2 - 40
-        draw.rounded_rectangle((box_x1, box_y1, box_x2, box_y2), radius=18, fill="#FAF6F8", outline="#E9D7E0", width=2)
+        draw.rounded_rectangle((box_x1, box_y1, box_x2, box_y2), radius=18, fill=frame_fill, outline=soft_outline, width=2)
         _draw_text_block(draw, box_x1 + 28, box_y1 + 50, "No preview image stored in result.", font_text, text_muted, box_x2 - box_x1 - 56)
 
     _draw_card(draw, (rx1, ry1, rx2, ry2), fill=card_fill, outline=border, radius=26)
@@ -931,14 +965,14 @@ def create_analysis_report(result):
     chip_gap = 14
     chip1_x1 = sw_x2 + 16
     chip2_x1 = chip1_x1 + chip_w + chip_gap
-    draw.rounded_rectangle((chip1_x1, chip_y, chip1_x1 + chip_w, chip_y + chip_h), radius=19, fill=pink_soft, outline="#F8D3E4")
-    draw.rounded_rectangle((chip2_x1, chip_y, chip2_x1 + chip_w, chip_y + chip_h), radius=19, fill=green_soft, outline="#D9E5C4")
+    draw.rounded_rectangle((chip1_x1, chip_y, chip1_x1 + chip_w, chip_y + chip_h), radius=19, fill=pink_soft, outline=soft_outline)
+    draw.rounded_rectangle((chip2_x1, chip_y, chip2_x1 + chip_w, chip_y + chip_h), radius=19, fill=green_soft, outline=soft_outline)
     draw.text((chip1_x1 + 18, chip_y + 8), f"{user_undertone}", font=font_small, fill=pink)
     draw.text((chip2_x1 + 18, chip_y + 8), f"{user_skintone}", font=font_small, fill=green)
 
     # compact MST box with confidence on same line as MST value
     mst_box_x1, mst_box_y1, mst_box_x2, mst_box_y2 = rx1 + 28, ry1 + 194, rx2 - 28, ry1 + 276
-    draw.rounded_rectangle((mst_box_x1, mst_box_y1, mst_box_x2, mst_box_y2), radius=20, fill="#FFF9FC", outline="#F1DEE8", width=2)
+    draw.rounded_rectangle((mst_box_x1, mst_box_y1, mst_box_x2, mst_box_y2), radius=20, fill=row_fill, outline=soft_outline, width=2)
     draw.text((mst_box_x1 + 22, mst_box_y1 + 11), "Predicted MST", font=font_label, fill=text_dark)
     line_y = mst_box_y1 + 39
     draw.text((mst_box_x1 + 22, line_y), f"MST-{mst}", font=font_mst, fill=text_dark)
@@ -946,12 +980,12 @@ def create_analysis_report(result):
     draw.text((conf_x, line_y + 1), "Confidence", font=font_small, fill=text_muted)
     conf_label_w = draw.textbbox((0, 0), "Confidence", font=font_small)[2]
     draw.text((conf_x + conf_label_w + 10, line_y), f"{confidence:.1f}%", font=font_conf, fill=pink)
-    _draw_progress_bar(draw, mst_box_x1 + 22, mst_box_y1 + 61, (mst_box_x2 - mst_box_x1) - 44, 10, confidence, fill=pink, bg="#F3E8EE")
+    _draw_progress_bar(draw, mst_box_x1 + 22, mst_box_y1 + 61, (mst_box_x2 - mst_box_x1) - 44, 10, confidence, fill=pink, bg=soft_outline)
 
     # compact CIELAB title and boxes
     cielab_y = ry1 + 304
     draw.text((rx1 + 28, cielab_y), "CIELAB Values", font=font_lab_title, fill=text_dark)
-    lab_cards = [("L*", str(L_val), "#EEF6FF", blue), ("a*", str(a_val), "#FFF1F1", pink), ("b*", str(b_val), "#FFF6EB", orange)]
+    lab_cards = [("L*", str(L_val), lab_blue_fill, blue), ("a*", str(a_val), lab_pink_fill, pink), ("b*", str(b_val), lab_orange_fill, orange)]
     lab_y = ry1 + 342
     lab_box_w, lab_box_h, gap = 104, 44, 12
     start_x = rx1 + 28
@@ -971,7 +1005,7 @@ def create_analysis_report(result):
         score = float(alt.get("score", 0) or 0)
         cy = alt_y + i * 28
         swatch = alt.get("hex") or alt_color_list[i % len(alt_color_list)]
-        draw.rounded_rectangle((rx1 + 28, cy, rx1 + 56, cy + 20), radius=8, fill=swatch, outline="#E5D0D8", width=1)
+        draw.rounded_rectangle((rx1 + 28, cy, rx1 + 56, cy + 20), radius=8, fill=swatch, outline=soft_outline, width=1)
         draw.text((rx1 + 68, cy), f"{label} • {score:.1f}%", font=font_small, fill=text_dark)
 
     left_bottom = (margin, by, 760, bottom_y2)
@@ -1000,17 +1034,17 @@ def create_analysis_report(result):
         swatch_hex = _safe_hex_from_rec(rec)
         y1 = row_y + (idx - 1) * (row_h + row_gap)
         y2 = y1 + row_h
-        draw.rounded_rectangle((row_x1, y1, row_x2, y2), radius=16, fill="#FFF9FC", outline="#F1DEE8", width=1)
+        draw.rounded_rectangle((row_x1, y1, row_x2, y2), radius=16, fill=row_fill, outline=soft_outline, width=1)
 
         badge_x1, badge_y1 = row_x1 + 14, y1 + 20
-        draw.rounded_rectangle((badge_x1, badge_y1, badge_x1 + 28, badge_y1 + 28), radius=10, fill="#FCE8F1", outline="#F6C8DD", width=1)
+        draw.rounded_rectangle((badge_x1, badge_y1, badge_x1 + 28, badge_y1 + 28), radius=10, fill=badge_fill, outline=soft_outline, width=1)
         num = str(idx)
         nb = draw.textbbox((0, 0), num, font=font_tiny)
         draw.text((badge_x1 + (28 - (nb[2] - nb[0])) // 2, badge_y1 + (28 - (nb[3] - nb[1])) // 2 - 1), num, font=font_tiny, fill="#D94E91")
 
         sw_size = 38
         sw_x1, sw_y1 = row_x2 - 60, y1 + 16
-        draw.rounded_rectangle((sw_x1, sw_y1, sw_x1 + sw_size, sw_y1 + sw_size), radius=12, fill=swatch_hex, outline="#E5D0D8", width=1)
+        draw.rounded_rectangle((sw_x1, sw_y1, sw_x1 + sw_size, sw_y1 + sw_size), radius=12, fill=swatch_hex, outline=soft_outline, width=1)
 
         text_x = badge_x1 + 40
         text_max_w = sw_x1 - 16 - text_x
@@ -1018,11 +1052,11 @@ def create_analysis_report(result):
         product_line = _fit_text(draw, product_i, font_tiny, text_max_w)
         meta = _fit_text(draw, f"{undertone_i} • {price_i}", font_tiny, text_max_w)
         draw.text((text_x, y1 + 8), title, font=font_text, fill=text_dark)
-        draw.text((text_x, y1 + 31), product_line, font=font_tiny, fill="#8A7682")
+        draw.text((text_x, y1 + 31), product_line, font=font_tiny, fill=product_muted)
         draw.text((text_x, y1 + 49), meta, font=font_tiny, fill=text_muted)
 
-    draw.text((margin + 4, H - 42), "Generated by ShadeMate", font=font_small, fill="#A18897")
-    draw.text((W - 320, H - 42), datetime.now().strftime("%Y-%m-%d %H:%M:%S"), font=font_small, fill="#A18897")
+    draw.text((margin + 4, H - 42), "Generated by ShadeMate", font=font_small, fill=footer_muted)
+    draw.text((W - 320, H - 42), datetime.now().strftime("%Y-%m-%d %H:%M:%S"), font=font_small, fill=footer_muted)
     return img
 
 
@@ -1452,6 +1486,52 @@ def inject_ui_hotfix_css():
     @media(max-width:900px){ .result-grid{ grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:.85rem !important; } .color-grid{ grid-template-columns:repeat(3,minmax(0,1fr)) !important; gap:.65rem !important; } .color-box{ padding:.85rem .65rem !important; min-height:112px !important; } .color-hex-value{ font-size:.95rem !important; } .result-preview-card .analysis-preview-img img{ max-height:280px !important; } }
     @media(max-width:520px){ .result-grid{ grid-template-columns:1fr !important; } .metric-card{ min-height:118px !important; padding:1rem !important; } .metric-card .metric-value{ font-size:1.65rem !important; } .color-grid{ grid-template-columns:1fr !important; } .color-box{ min-height:auto !important; } .detected-skin-swatch{ width:100% !important; min-width:100% !important; height:74px !important; } .result-preview-card{ padding:.85rem !important; } }
 
+
+    /* ===== Dark-mode fixes: privacy notice, tech stack, references ===== */
+    .notice{
+        background:var(--sm-card) !important;
+        color:var(--sm-text) !important;
+        border:1px solid var(--sm-border) !important;
+        box-shadow:var(--sm-shadow) !important;
+    }
+    .notice strong{ color:var(--sm-text) !important; }
+    .tech-stack-box{
+        background:var(--sm-card) !important;
+        color:var(--sm-text) !important;
+        border:1px solid var(--sm-border) !important;
+        box-shadow:var(--sm-shadow) !important;
+    }
+    .tech-card.compact{
+        background:rgba(255,255,255,.72) !important;
+        color:var(--sm-text) !important;
+        border:1px solid rgba(244,138,189,.28) !important;
+        box-shadow:none !important;
+    }
+    .tech-card.compact strong{ color:var(--sm-text) !important; }
+    .tech-card.compact .small-text{ color:var(--sm-muted) !important; }
+    .ref-box{
+        background:var(--sm-card) !important;
+        color:var(--sm-text) !important;
+        border:1px solid var(--sm-border) !important;
+        border-radius:1.25rem !important;
+        box-shadow:var(--sm-shadow) !important;
+    }
+    .ref-box strong{ color:var(--sm-text) !important; }
+    .ref-box .small-text{ color:var(--sm-muted) !important; }
+    @media (prefers-color-scheme: dark){
+        .tech-card.compact{
+            background:rgba(255,255,255,.08) !important;
+            border-color:rgba(244,138,189,.34) !important;
+        }
+        .tech-icon.compact{
+            background:rgba(244,138,189,.20) !important;
+        }
+        .ref-box,
+        .notice{
+            background:rgba(45,34,43,.94) !important;
+        }
+    }
+
     #MainMenu, footer, [data-testid="stDecoration"] { visibility:hidden !important; display:none !important; }
     </style>
     """, unsafe_allow_html=True)
@@ -1800,7 +1880,7 @@ def recommendations_page():
         img_tag = ("<img class='html-product-img' src='" + img_src + "'/>" if img_src else "<div class='html-product-img'></div>")
         html_card = f"""<div class="html-product-card"><div class="html-product-top"><div>{img_tag}</div><div><div class="html-brand">{ehtml(brand)}</div><div class="html-name">{ehtml(product)} - {ehtml(shade)}</div><div style="display:flex;align-items:center;gap:.55rem;"><div class="swatch" style="width:34px;height:28px;background:{hex_color};"></div><span class="small-text">{hex_color}</span></div><div style="margin-top:.6rem;"><span class="chip">{ehtml(undertone)}</span> <span class="chip">{ehtml(skintone)}</span></div></div><div class="html-price"><div>{ehtml(price)}</div><div class="small-text">{ml}</div><div style="margin-top:.6rem;" class="match-badge">▲ {sim:.1f}% match</div></div></div><div style="display:flex;justify-content:space-between;"><span class="small-text">Match Score</span><strong>{sim:.1f}%</strong></div><div class="html-bar"><div style="width:{sim:.1f}%;"></div></div></div>"""
         with cols[idx % 2]: st.markdown(html_card, unsafe_allow_html=True)
-    report_img = create_analysis_report(result)
+    report_img = create_analysis_report(result, dark_mode=True)
     buffer = BytesIO(); report_img.save(buffer, format="PNG"); buffer.seek(0)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     st.download_button(label="📥 Download Hasil Analisis", data=buffer, file_name=f"hasil_analisis_foundation_{timestamp}.png", mime="image/png", use_container_width=True)
