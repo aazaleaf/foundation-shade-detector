@@ -1674,7 +1674,7 @@ def skin_analysis_page(resources):
 def results_page():
     result = st.session_state.get("analysis_result")
     if result is None:
-        st.info("There are no analysis results yet. Do a skin analysis first.")
+        st.info("There are no analysis results yet. Please run a skin analysis first.")
         if st.button("Go to Skin Analysis →", type="primary"):
             st.session_state["page"] = "Skin Analysis"
             st.rerun()
