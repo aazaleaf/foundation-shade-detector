@@ -1,3 +1,5 @@
+from unittest import result
+
 import streamlit as st
 import numpy as np
 import cv2
@@ -445,7 +447,6 @@ def run_pipeline(img_rgb, face_mesh, ensemble, scaler,
                  kmeans, centroids, df_found, mst_hex_lookup, feature_cols):
     t0 = time.time()
 
-    # Guard: pastikan RGB 3 channel
     if img_rgb.ndim == 3 and img_rgb.shape[2] == 4:
         img_rgb = img_rgb[:, :, :3]
 
@@ -503,30 +504,30 @@ def run_pipeline(img_rgb, face_mesh, ensemble, scaler,
     user_skintone = estimate_user_skintone(mst)
     
     return {
-        "mst_pred"  : mst,
-        "confidence": conf,
-        "top3"      : top3_hex,
-        "shade_name": top_rec["Shade"],
-        "brand"     : top_rec["Brand"],
-        "product"   : top_rec["Product"],
-        # FIX Bug 2: Gunakan warna LAB spesifik shade produk, bukan warna rata-rata grup MST.
-        # mst_hex adalah warna representatif seluruh grup MST yang sama untuk semua produk
-        # dalam grup tersebut, sehingga tidak mencerminkan warna shade yang direkomendasikan.
-        "hex_color" : cielab_to_hex(top_rec["lab_L"], top_rec["lab_a"], top_rec["lab_b"]),
-        "skin_hex"  : skin_hex,
-        "user_undertone": user_undertone,
-        "user_skintone" : user_skintone,
-        "undertone" : top_rec["Undertone"],
-        "price"     : format_rupiah(top_rec["Price"]),
-        "top5_recs" : recs.to_dict(orient="records"),
-        "cielab"    : {
-            "L": round(feats["global_L_mean"], 2),
-            "a": round(feats["global_a_mean"], 2),
-            "b": round(feats["global_b_mean"], 2),
-        },
-        "latency_ms": latency,
-        "vis_frame" : vis,
-    }, None
+    "mst_pred"  : mst,
+    "confidence": conf,
+    "top3"      : top3_hex,
+    "shade_name": top_rec["Shade"],
+    "brand"     : top_rec["Brand"],
+    "product"   : top_rec["Product"],
+    "hex_color" : cielab_to_hex(top_rec["lab_L"], top_rec["lab_a"], top_rec["lab_b"]),
+    "skin_hex"  : skin_hex,
+    "user_undertone": user_undertone,
+    "user_skintone" : user_skintone,
+    "undertone" : top_rec["Undertone"],
+    "price"     : format_rupiah(top_rec["Price"]),
+    "top5_recs" : recs.to_dict(orient="records"),
+    "cielab"    : {
+        "L": round(feats["global_L_mean"], 2),
+        "a": round(feats["global_a_mean"], 2),
+        "b": round(feats["global_b_mean"], 2),
+    },
+    "latency_ms": latency,
+
+    "vis_frame" : vis,
+
+    "report_face_image": vis,
+}, None
 def load_font(size, bold=False):
     paths = [
         "arialbd.ttf" if bold else "arial.ttf",
@@ -541,122 +542,491 @@ def load_font(size, bold=False):
 
     return ImageFont.load_default()
 
+from PIL import Image, ImageDraw, ImageFont, ImageOps
+from io import BytesIO
+from datetime import datetime
+import numpy as np
+
+# =========================================================
+# HELPER
+# =========================================================
+def _load_font(size=24, bold=False):
+    candidates = []
+    if bold:
+        candidates = [
+            "arialbd.ttf",
+            "Arial Bold.ttf",
+            "DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        ]
+    else:
+        candidates = [
+            "arial.ttf",
+            "Arial.ttf",
+            "DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        ]
+
+    for path in candidates:
+        try:
+            return ImageFont.truetype(path, size=size)
+        except:
+            continue
+    return ImageFont.load_default()
+
+
+def _wrap_text(draw, text, font, max_width):
+    words = str(text).split()
+    lines = []
+    current = ""
+
+    for word in words:
+        test = word if current == "" else current + " " + word
+        bbox = draw.textbbox((0, 0), test, font=font)
+        w = bbox[2] - bbox[0]
+        if w <= max_width:
+            current = test
+        else:
+            if current:
+                lines.append(current)
+            current = word
+    if current:
+        lines.append(current)
+
+    return lines
+
+
+def _draw_card(draw, xy, fill="#FFFFFF", outline="#E8CAD8", radius=24, width=2):
+    draw.rounded_rectangle(xy, radius=radius, fill=fill, outline=outline, width=width)
+
+
+def _draw_text_block(draw, x, y, text, font, fill, max_width, line_gap=8):
+    lines = _wrap_text(draw, text, font, max_width)
+    yy = y
+    for line in lines:
+        draw.text((x, yy), line, font=font, fill=fill)
+        bbox = draw.textbbox((x, yy), line, font=font)
+        yy += (bbox[3] - bbox[1]) + line_gap
+    return yy
+
+
+import re
+from pathlib import Path
+from io import BytesIO
+from datetime import datetime
+from PIL import Image, ImageDraw, ImageFont, ImageOps
+import numpy as np
+
+
+def _format_price(value):
+    """Format harga menjadi Rp.239.000,00."""
+    if value is None or value == "":
+        return "-"
+    try:
+        if isinstance(value, (int, float)):
+            integer = int(round(float(value)))
+            return f"Rp.{integer:,}".replace(",", ".") + ",00"
+
+        s = str(value).strip()
+        if s in ["-", "nan", "None"]:
+            return "-"
+
+        s = s.replace("Rp", "").replace("rp", "").strip()
+        s = re.sub(r",00$", "", s)
+        digits = re.sub(r"[^\d]", "", s)
+        if digits:
+            integer = int(digits)
+            return f"Rp.{integer:,}".replace(",", ".") + ",00"
+        return str(value)
+    except Exception:
+        return str(value)
+
+
+def _load_font(size=24, bold=False):
+    candidates = []
+    if bold:
+        candidates = [
+            "arialbd.ttf",
+            "Arial Bold.ttf",
+            "DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        ]
+    else:
+        candidates = [
+            "arial.ttf",
+            "Arial.ttf",
+            "DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        ]
+
+    for path in candidates:
+        try:
+            return ImageFont.truetype(path, size=size)
+        except Exception:
+            continue
+    return ImageFont.load_default()
+
+
+def _wrap_text(draw, text, font, max_width):
+    words = str(text).split()
+    lines = []
+    current = ""
+    for word in words:
+        test = word if not current else current + " " + word
+        bbox = draw.textbbox((0, 0), test, font=font)
+        if bbox[2] - bbox[0] <= max_width:
+            current = test
+        else:
+            if current:
+                lines.append(current)
+            current = word
+    if current:
+        lines.append(current)
+    return lines
+
+
+def _fit_text(draw, text, font, max_width):
+    text = str(text)
+    if draw.textbbox((0, 0), text, font=font)[2] <= max_width:
+        return text
+    ell = "…"
+    while text and draw.textbbox((0, 0), text + ell, font=font)[2] > max_width:
+        text = text[:-1]
+    return text + ell if text else ell
+
+
+def _draw_card(draw, xy, fill="#FFFFFF", outline="#E8CAD8", radius=24, width=2):
+    draw.rounded_rectangle(xy, radius=radius, fill=fill, outline=outline, width=width)
+
+
+def _draw_text_block(draw, x, y, text, font, fill, max_width, line_gap=8, max_lines=None):
+    lines = _wrap_text(draw, text, font, max_width)
+    if max_lines is not None:
+        lines = lines[:max_lines]
+        if len(_wrap_text(draw, text, font, max_width)) > max_lines and lines:
+            lines[-1] = _fit_text(draw, lines[-1], font, max_width)
+    yy = y
+    for line in lines:
+        draw.text((x, yy), line, font=font, fill=fill)
+        bbox = draw.textbbox((x, yy), line, font=font)
+        yy += (bbox[3] - bbox[1]) + line_gap
+    return yy
+
+
+def _extract_report_image(result):
+    possible_keys = [
+        "report_face_image",
+        "vis_frame",
+        "annotated_image",
+        "face_preview",
+        "frame_landmark_image",
+        "result_image",
+        "preview_image",
+    ]
+    for key in possible_keys:
+        obj = result.get(key)
+        if obj is None:
+            continue
+        if isinstance(obj, Image.Image):
+            return obj.convert("RGB")
+        if isinstance(obj, np.ndarray) and obj.ndim == 3:
+            try:
+                return Image.fromarray(obj.astype(np.uint8)).convert("RGB")
+            except Exception:
+                pass
+    return None
+
+
+def _draw_progress_bar(draw, x, y, w, h, percent, fill="#F48ABD", bg="#F2E8ED"):
+    draw.rounded_rectangle((x, y, x + w, y + h), radius=h // 2, fill=bg)
+    try:
+        p = max(0, min(100, float(percent)))
+    except Exception:
+        p = 0
+    fw = int(w * (p / 100.0))
+    if fw > 0:
+        draw.rounded_rectangle((x, y, x + fw, y + h), radius=h // 2, fill=fill)
+
+
+def _load_logo_image(size=(54, 54)):
+    app_dir = Path(__file__).parent
+    candidate_paths = [
+        app_dir / "assets" / "logo.png",
+        app_dir / "assets" / "logo.jpg",
+        app_dir / "assets" / "logo.jpeg",
+        app_dir / "assets" / "logo.webp",
+        app_dir / "assets" / "logo.svg",
+    ]
+    for path in candidate_paths:
+        if not path.exists():
+            continue
+        try:
+            if path.suffix.lower() == ".svg":
+                try:
+                    import cairosvg
+                    png_bytes = cairosvg.svg2png(url=str(path))
+                    logo = Image.open(BytesIO(png_bytes)).convert("RGBA")
+                except Exception:
+                    continue
+            else:
+                logo = Image.open(path).convert("RGBA")
+            logo.thumbnail(size, Image.LANCZOS)
+            return logo
+        except Exception:
+            continue
+    return None
+
+
+def _paste_logo_or_fallback(base_img, draw, x, y, size=54):
+    logo = _load_logo_image((size, size))
+    if logo is not None:
+        lx = x + (size - logo.width) // 2
+        ly = y + (size - logo.height) // 2
+        base_img.paste(logo, (lx, ly), logo)
+    else:
+        draw.rounded_rectangle((x, y, x + size, y + size), radius=16, fill="#F6D8E6", outline="#EBCFDB", width=2)
+        draw.text((x + 15, y + 9), "✿", font=_load_font(24, bold=True), fill="#2F2330")
+
+
+def _safe_hex_from_rec(rec, fallback="#D8C3BC"):
+    try:
+        hx = str(rec.get("hex_color", "")).strip()
+        if hx.startswith("#") and len(hx) in [4, 7]:
+            return hx
+        if all(k in rec for k in ["lab_L", "lab_a", "lab_b"]):
+            return cielab_to_hex(float(rec["lab_L"]), float(rec["lab_a"]), float(rec["lab_b"]))
+    except Exception:
+        pass
+    return fallback
+
+
+def _get_alt_mst(result, confidence):
+    top3 = result.get("top3") or result.get("top_mst_alternatives") or []
+    alts = []
+    for item in top3:
+        if isinstance(item, dict):
+            if "mst" in item:
+                alts.append({"label": f"MST-{item.get('mst')}", "score": float(item.get("conf", item.get("score", 0)) or 0), "hex": item.get("hex")})
+            else:
+                alts.append({"label": str(item.get("label", "-")), "score": float(item.get("score", 0) or 0), "hex": item.get("hex")})
+    if not alts:
+        alts = [{"label": f"MST-{result.get('mst_pred', '-')}", "score": confidence, "hex": None}]
+    return alts
+
+
 def create_analysis_report(result):
-    # Canvas report
-    W, H = 1400, 1000
-    bg = (255, 255, 255)
+    mst = result.get("mst_pred", "-")
+    confidence = float(result.get("confidence", result.get("mst_confidence", 0) or 0))
+    skin_hex = result.get("skin_hex", "#B2806F")
+    user_undertone = result.get("user_undertone", "-")
+    user_skintone = result.get("user_skintone", "-")
+
+    lab = result.get("cielab", {})
+    L_val = lab.get("L", "-")
+    a_val = lab.get("a", "-")
+    b_val = lab.get("b", "-")
+
+    brand = result.get("brand", "-")
+    product = result.get("product", "-")
+    shade = result.get("shade_name", result.get("shade", "-"))
+    rec_undertone = result.get("undertone", "-")
+    price = _format_price(result.get("price", "-"))
+    top5 = result.get("top5_recs", [])
+    alt_mst = _get_alt_mst(result, confidence)
+    report_img = _extract_report_image(result)
+
+    W = 1600
+    bg = "#FCF7FA"
+    card_fill = "#FFFFFF"
+    border = "#EBCFDB"
+    text_dark = "#2F2330"
+    text_muted = "#7A6674"
+    pink = "#F48ABD"
+    pink_soft = "#FFF0F6"
+    green = "#758952"
+    green_soft = "#EEF3E5"
+    blue = "#66B4E8"
+    orange = "#FF9A57"
+    line = "#E9D7E0"
+
+    font_title = _load_font(42, bold=True)
+    font_sub = _load_font(20)
+    font_h2 = _load_font(28, bold=True)
+    font_label = _load_font(18, bold=True)
+    font_text = _load_font(20)
+    font_small = _load_font(16)
+    font_tiny = _load_font(14)
+    font_mst = _load_font(17, bold=True)
+    font_conf = _load_font(14, bold=True)
+    font_lab_title = _load_font(18, bold=True)
+    font_lab_label = _load_font(15, bold=True)
+    font_lab_value = _load_font(15, bold=True)
+    font_hex = _load_font(20, bold=True)
+
+    margin = 50
+    header_y1, header_y2 = 35, 155
+    top_y = 190
+
+    left_x1, left_y1, left_x2 = margin, top_y, 760
+    rx1, ry1, rx2 = 800, top_y, W - margin
+
+    preview = None
+    frame_w = frame_h = 0
+    if report_img is not None:
+        preview = report_img.copy()
+        preview.thumbnail((600, 500), Image.LANCZOS)
+        frame_pad = 10
+        frame_w = preview.width + frame_pad * 2
+        frame_h = preview.height + frame_pad * 2
+        left_y2 = left_y1 + 100 + frame_h + 36
+    else:
+        left_y2 = left_y1 + 540
+
+    ry2 = ry1 + 540
+    by = max(left_y2, ry2) + 40
+    bottom_y2 = by + 500
+    H = bottom_y2 + 70
+
     img = Image.new("RGB", (W, H), bg)
     draw = ImageDraw.Draw(img)
 
-    # Font fallback
-    try:
-        font_title = load_font(42, bold=True)
-        font_h1 = load_font(34, bold=True)
-        font_h2 = load_font(28, bold=True)
-        font_text = load_font(24)
-        font_small = load_font(21)
-        font_table = load_font(20)
-        font_big = load_font(54, bold=True)
-    except:
-        font_title = ImageFont.load_default()
-        font_h2 = ImageFont.load_default()
-        font_text = ImageFont.load_default()
-        font_small = ImageFont.load_default()
-        font_big = ImageFont.load_default()
+    _draw_card(draw, (margin, header_y1, W - margin, header_y2), fill=card_fill, outline=border, radius=28)
+    _paste_logo_or_fallback(img, draw, 76, 68, size=54)
+    draw.text((145, 62), "ShadeMate", font=font_title, fill=text_dark)
+    draw.text((145, 112), "Foundation Shade Detector • Analysis Report", font=font_sub, fill=text_muted)
+    timestamp = datetime.now().strftime("%d %B %Y • %H:%M")
+    tw = draw.textbbox((0, 0), timestamp, font=font_small)[2]
+    draw.text((W - margin - 40 - tw, 70), timestamp, font=font_small, fill=text_muted)
 
-    # Title
-    draw.text((50, 35), "Foundation Shade Detector - Hasil Analisis", fill=(30, 30, 30), font=font_title)
+    _draw_card(draw, (left_x1, left_y1, left_x2, left_y2), fill=card_fill, outline=border, radius=26)
+    draw.text((left_x1 + 28, left_y1 + 24), "Frame + Landmark", font=font_h2, fill=text_dark)
 
-    # Frame landmark
-    frame = Image.fromarray(result["vis_frame"]).convert("RGB")
-    frame.thumbnail((520, 380))
-    draw.text((50, 115), "Frame + Landmark", fill=(30, 30, 30), font=font_h2)
-    img.paste(frame, (50, 165))
+    if preview is not None:
+        fx1 = left_x1 + ((left_x2 - left_x1) - frame_w) // 2
+        fy1 = left_y1 + 86
+        fx2, fy2 = fx1 + frame_w, fy1 + frame_h
+        draw.rounded_rectangle((fx1, fy1, fx2, fy2), radius=16, fill="#FAF6F8", outline="#E9D7E0", width=2)
+        img.paste(preview, (fx1 + 10, fy1 + 10))
+    else:
+        box_x1, box_y1, box_x2, box_y2 = left_x1 + 40, left_y1 + 100, left_x2 - 40, left_y2 - 40
+        draw.rounded_rectangle((box_x1, box_y1, box_x2, box_y2), radius=18, fill="#FAF6F8", outline="#E9D7E0", width=2)
+        _draw_text_block(draw, box_x1 + 28, box_y1 + 50, "No preview image stored in result.", font_text, text_muted, box_x2 - box_x1 - 56)
 
-    # Prediksi MST
-    x = 630
-    y = 115
-    draw.text((x, y), "Prediksi MST", fill=(30, 30, 30), font=font_h2)
+    _draw_card(draw, (rx1, ry1, rx2, ry2), fill=card_fill, outline=border, radius=26)
+    draw.text((rx1 + 28, ry1 + 24), "Skin Tone Summary", font=font_h2, fill=text_dark)
+    draw.text((rx1 + 28, ry1 + 80), "Detected Skin Color", font=font_label, fill=text_dark)
 
-    # Color boxes
-    skin_hex = result.get("skin_hex", "")
-    detected_hex = skin_hex if skin_hex else "-"
-    foundation_hex = result["hex_color"]
+    # more compact swatch and equal-length chips
+    sw_x1, sw_y1, sw_x2, sw_y2 = rx1 + 28, ry1 + 112, rx1 + 350, ry1 + 166
+    draw.rounded_rectangle((sw_x1, sw_y1, sw_x2, sw_y2), radius=17, fill=skin_hex, outline=None)
+    hex_bbox = draw.textbbox((0, 0), skin_hex, font=font_hex)
+    hex_w = hex_bbox[2] - hex_bbox[0]
+    hex_h = hex_bbox[3] - hex_bbox[1]
+    light_hexes = ["#f6ede4", "#f3e7db", "#f7ead0", "#f8ead8", "#ffffff"]
+    draw.text((sw_x1 + ((sw_x2 - sw_x1) - hex_w) // 2, sw_y1 + ((sw_y2 - sw_y1) - hex_h) // 2 - 1), skin_hex, font=font_hex, fill="#FFFFFF" if str(skin_hex).lower() not in light_hexes else text_dark)
 
-    draw.text((x, y + 60), "Warna Kulit Terdeteksi", fill=(40, 40, 40), font=font_text)
-    draw.rounded_rectangle((x, y + 100, x + 260, y + 150), radius=12, fill=detected_hex if detected_hex != "-" else "#cccccc", outline=(200, 200, 200))
-    draw.text((x + 285, y + 112), detected_hex, fill=(40, 40, 40), font=font_text)
+    chip_y = ry1 + 119
+    chip_w = 150
+    chip_h = 38
+    chip_gap = 14
+    chip1_x1 = sw_x2 + 16
+    chip2_x1 = chip1_x1 + chip_w + chip_gap
+    draw.rounded_rectangle((chip1_x1, chip_y, chip1_x1 + chip_w, chip_y + chip_h), radius=19, fill=pink_soft, outline="#F8D3E4")
+    draw.rounded_rectangle((chip2_x1, chip_y, chip2_x1 + chip_w, chip_y + chip_h), radius=19, fill=green_soft, outline="#D9E5C4")
+    draw.text((chip1_x1 + 18, chip_y + 8), f"{user_undertone}", font=font_small, fill=pink)
+    draw.text((chip2_x1 + 18, chip_y + 8), f"{user_skintone}", font=font_small, fill=green)
 
-    draw.text((x, y + 180), "Foundation Cocok", fill=(40, 40, 40), font=font_text)
-    draw.rounded_rectangle((x, y + 220, x + 260, y + 270), radius=12, fill=foundation_hex, outline=(200, 200, 200))
-    draw.text((x + 285, y + 232), foundation_hex, fill=(40, 40, 40), font=font_text)
+    # compact MST box with confidence on same line as MST value
+    mst_box_x1, mst_box_y1, mst_box_x2, mst_box_y2 = rx1 + 28, ry1 + 194, rx2 - 28, ry1 + 276
+    draw.rounded_rectangle((mst_box_x1, mst_box_y1, mst_box_x2, mst_box_y2), radius=20, fill="#FFF9FC", outline="#F1DEE8", width=2)
+    draw.text((mst_box_x1 + 22, mst_box_y1 + 11), "Predicted MST", font=font_label, fill=text_dark)
+    line_y = mst_box_y1 + 39
+    draw.text((mst_box_x1 + 22, line_y), f"MST-{mst}", font=font_mst, fill=text_dark)
+    conf_x = mst_box_x1 + 182
+    draw.text((conf_x, line_y + 1), "Confidence", font=font_small, fill=text_muted)
+    conf_label_w = draw.textbbox((0, 0), "Confidence", font=font_small)[2]
+    draw.text((conf_x + conf_label_w + 10, line_y), f"{confidence:.1f}%", font=font_conf, fill=pink)
+    _draw_progress_bar(draw, mst_box_x1 + 22, mst_box_y1 + 61, (mst_box_x2 - mst_box_x1) - 44, 10, confidence, fill=pink, bg="#F3E8EE")
 
-    draw.text(
-        (x, y + 300),
-        f"Undertone: {result.get('user_undertone', '-')}  |  Skintone: {result.get('user_skintone', '-')}",
-        fill=(40, 40, 40),
-        font=font_text
-    )
+    # compact CIELAB title and boxes
+    cielab_y = ry1 + 304
+    draw.text((rx1 + 28, cielab_y), "CIELAB Values", font=font_lab_title, fill=text_dark)
+    lab_cards = [("L*", str(L_val), "#EEF6FF", blue), ("a*", str(a_val), "#FFF1F1", pink), ("b*", str(b_val), "#FFF6EB", orange)]
+    lab_y = ry1 + 342
+    lab_box_w, lab_box_h, gap = 104, 44, 12
+    start_x = rx1 + 28
+    for i, (label, value, fill_col, accent) in enumerate(lab_cards):
+        bx1 = start_x + i * (lab_box_w + gap)
+        by1 = lab_y
+        bx2, by2 = bx1 + lab_box_w, by1 + lab_box_h
+        draw.rounded_rectangle((bx1, by1, bx2, by2), radius=12, fill=fill_col, outline=accent, width=2)
+        draw.text((bx1 + 12, by1 + 12), label, font=font_lab_label, fill=accent)
+        draw.text((bx1 + 40, by1 + 12), str(value), font=font_lab_value, fill=text_dark)
 
-    # MST card
-    card_x = 1050
-    card_y = 175
-    draw.rounded_rectangle((card_x, card_y, card_x + 280, card_y + 150), radius=20, fill=(245, 245, 245), outline=(220, 220, 220))
-    draw.text((card_x + 55, card_y + 35), f"MST {result['mst_pred']}", fill=(25, 25, 25), font=font_big)
-    draw.text((card_x + 55, card_y + 105), f"Confidence: {result['confidence']}%", fill=(80, 80, 80), font=font_small)
+    draw.text((rx1 + 28, ry1 + 406), "Top Alternative MST", font=font_label, fill=text_dark)
+    alt_y = ry1 + 440
+    alt_color_list = ["#D9C19D", "#B8885E", "#8F6548", "#6C4E3B"]
+    for i, alt in enumerate(alt_mst[:3]):
+        label = alt.get("label", "-")
+        score = float(alt.get("score", 0) or 0)
+        cy = alt_y + i * 28
+        swatch = alt.get("hex") or alt_color_list[i % len(alt_color_list)]
+        draw.rounded_rectangle((rx1 + 28, cy, rx1 + 56, cy + 20), radius=8, fill=swatch, outline="#E5D0D8", width=1)
+        draw.text((rx1 + 68, cy), f"{label} • {score:.1f}%", font=font_small, fill=text_dark)
 
-    # Top 3
-    draw.text((1050, 360), "Top-3 Alternatif MST", fill=(40, 40, 40), font=font_text)
-    yy = 405
-    for t in result["top3"]:
-        draw.rounded_rectangle((1050, yy, 1085, yy + 35), radius=6, fill=t["hex"], outline=(180, 180, 180))
-        draw.text((1100, yy + 3), f"MST {t['mst']} - {t['conf']}%", fill=(40, 40, 40), font=font_small)
-        yy += 48
+    left_bottom = (margin, by, 760, bottom_y2)
+    right_bottom = (800, by, W - margin, bottom_y2)
+    _draw_card(draw, left_bottom, fill=card_fill, outline=border, radius=26)
+    _draw_card(draw, right_bottom, fill=card_fill, outline=border, radius=26)
 
-    # CIELAB
-    draw.text((630, 470), "Nilai CIELAB Kulit", fill=(30, 30, 30), font=font_h2)
-    draw.text((630, 525), f"L*  : {result['cielab']['L']}", fill=(40, 40, 40), font=font_text)
-    draw.text((830, 525), f"a*  : {result['cielab']['a']}", fill=(40, 40, 40), font=font_text)
-    draw.text((1030, 525), f"b*  : {result['cielab']['b']}", fill=(40, 40, 40), font=font_text)
+    draw.text((margin + 28, by + 24), "Main Recommendation", font=font_h2, fill=text_dark)
+    draw.line((margin + 28, by + 72, 760 - 28, by + 72), fill=line, width=2)
+    info_x, info_y = margin + 28, by + 104
+    for label, value in [("Brand", brand), ("Product", product), ("Shade", shade), ("Undertone", rec_undertone), ("Price", price)]:
+        draw.text((info_x, info_y), str(label), font=font_label, fill=text_muted)
+        _draw_text_block(draw, info_x + 145, info_y, value, font_text, text_dark, 760 - info_x - 190, line_gap=6, max_lines=2)
+        info_y += 74
 
-    # Rekomendasi utama
-    y2 = 620
-    draw.line((50, y2 - 30, 1350, y2 - 30), fill=(220, 220, 220), width=2)
-    draw.text((50, y2), "Rekomendasi Foundation", fill=(30, 30, 30), font=font_h2)
+    draw.text((800 + 28, by + 24), "Top 5 Recommendations", font=font_h2, fill=text_dark)
+    draw.line((800 + 28, by + 72, W - margin - 28, by + 72), fill=line, width=2)
+    row_x1, row_x2 = 828, W - margin - 28
+    row_y, row_h, row_gap = by + 92, 70, 8
+    for idx, rec in enumerate(top5[:5], start=1):
+        brand_i = str(rec.get("Brand", "-"))
+        product_i = str(rec.get("Product", "-"))
+        shade_i = str(rec.get("Shade", rec.get("shade_name", "-")))
+        undertone_i = str(rec.get("Undertone", "-"))
+        price_i = _format_price(rec.get("Price", "-"))
+        swatch_hex = _safe_hex_from_rec(rec)
+        y1 = row_y + (idx - 1) * (row_h + row_gap)
+        y2 = y1 + row_h
+        draw.rounded_rectangle((row_x1, y1, row_x2, y2), radius=16, fill="#FFF9FC", outline="#F1DEE8", width=1)
 
-    rec_lines = [
-        f"Brand      : {result['brand']}",
-        f"Produk     : {result['product']}",
-        f"Shade      : {result['shade_name']}",
-        f"Undertone  : {result['undertone']}",
-        f"Price      : {result['price']}",
-    ]
+        badge_x1, badge_y1 = row_x1 + 14, y1 + 20
+        draw.rounded_rectangle((badge_x1, badge_y1, badge_x1 + 28, badge_y1 + 28), radius=10, fill="#FCE8F1", outline="#F6C8DD", width=1)
+        num = str(idx)
+        nb = draw.textbbox((0, 0), num, font=font_tiny)
+        draw.text((badge_x1 + (28 - (nb[2] - nb[0])) // 2, badge_y1 + (28 - (nb[3] - nb[1])) // 2 - 1), num, font=font_tiny, fill="#D94E91")
 
-    yy = y2 + 55
-    for line in rec_lines:
-        draw.text((50, yy), line, fill=(40, 40, 40), font=font_text)
-        yy += 38
+        sw_size = 38
+        sw_x1, sw_y1 = row_x2 - 60, y1 + 16
+        draw.rounded_rectangle((sw_x1, sw_y1, sw_x1 + sw_size, sw_y1 + sw_size), radius=12, fill=swatch_hex, outline="#E5D0D8", width=1)
 
-    # Top 5
-    draw.text((700, y2), "Top-5 Rekomendasi Foundation", fill=(30, 30, 30), font=font_h2)
-    yy = y2 + 55
+        text_x = badge_x1 + 40
+        text_max_w = sw_x1 - 16 - text_x
+        title = _fit_text(draw, f"{brand_i} • {shade_i}", font_text, text_max_w)
+        product_line = _fit_text(draw, product_i, font_tiny, text_max_w)
+        meta = _fit_text(draw, f"{undertone_i} • {price_i}", font_tiny, text_max_w)
+        draw.text((text_x, y1 + 8), title, font=font_text, fill=text_dark)
+        draw.text((text_x, y1 + 31), product_line, font=font_tiny, fill="#8A7682")
+        draw.text((text_x, y1 + 49), meta, font=font_tiny, fill=text_muted)
 
-    for i, rec in enumerate(result["top5_recs"][:5], start=1):
-        brand = str(rec.get("Brand", "-"))
-        shade = str(rec.get("Shade", "-"))
-        undertone = str(rec.get("Undertone", "-"))
-        price = format_rupiah(rec.get("Price", "-"))
-
-        line = f"{i}. {brand} | {shade} | {undertone} | {price}"
-        draw.text((700, yy), line[:55], fill=(40, 40, 40), font=font_small)
-        yy += 40
-
+    draw.text((margin + 4, H - 42), "Generated by ShadeMate", font=font_small, fill="#A18897")
+    draw.text((W - 320, H - 42), datetime.now().strftime("%Y-%m-%d %H:%M:%S"), font=font_small, fill="#A18897")
     return img
 
 
-# ─────────────────────────────────────────────
-# SHADEMATE FINAL UI v4 — UI baru + pipeline asli app_backup.py
-# ─────────────────────────────────────────────
+# shade matching
 from pathlib import Path
 import base64
 import html
@@ -797,25 +1167,62 @@ def slug(text):
 
 
 def product_image_path(brand, shade=None):
-    if shade:
-        possible = [
-            PRODUCT_DIR / str(brand) / f"{shade}.jpg",
-            PRODUCT_DIR / str(brand) / f"{shade}.png",
-            PRODUCT_DIR / str(brand) / f"{shade}.jpeg",
-            PRODUCT_DIR / str(brand) / f"{shade}.webp",
-        ]
-        for path in possible:
-            if path.exists():
-                return str(path)
-    brand_fallback = PRODUCT_DIR / f"{slug(brand)}.png"
-    if brand_fallback.exists():
-        return str(brand_fallback)
+    """Cari gambar produk secara robust.
+    - folder brand dicari case-insensitive, jadi brand "Mop" tetap bisa masuk ke folder "MOP"
+    - nama shade dicari case-insensitive
+    - support jpg/png/jpeg/webp/avif
+    """
+    try:
+        brand_str = str(brand).strip()
+        shade_str = str(shade).strip() if shade is not None else ""
+
+        # 1) cari folder brand exact dulu, lalu case-insensitive
+        brand_dir = PRODUCT_DIR / brand_str
+        if not brand_dir.exists():
+            brand_dir = None
+            if PRODUCT_DIR.exists():
+                for child in PRODUCT_DIR.iterdir():
+                    if child.is_dir() and child.name.lower() == brand_str.lower():
+                        brand_dir = child
+                        break
+
+        # 2) cari file berdasarkan shade di dalam folder brand
+        if brand_dir and brand_dir.exists() and shade_str:
+            allowed_ext = {".jpg", ".jpeg", ".png", ".webp", ".avif"}
+
+            # exact candidate
+            for ext in allowed_ext:
+                candidate = brand_dir / f"{shade_str}{ext}"
+                if candidate.exists():
+                    return str(candidate)
+
+            # case-insensitive exact stem
+            shade_key = shade_str.lower().strip()
+            for file in brand_dir.iterdir():
+                if file.is_file() and file.suffix.lower() in allowed_ext:
+                    if file.stem.lower().strip() == shade_key:
+                        return str(file)
+
+            # fallback contains matching: berguna kalau shade di CSV "C10 Pearl" dan file ada variasi nama
+            for file in brand_dir.iterdir():
+                if file.is_file() and file.suffix.lower() in allowed_ext:
+                    stem = file.stem.lower().strip()
+                    if shade_key in stem or stem in shade_key:
+                        return str(file)
+
+        # 3) fallback per brand png di root products
+        if PRODUCT_DIR.exists():
+            for file in PRODUCT_DIR.iterdir():
+                if file.is_file() and file.stem.lower() == slug(brand_str).lower():
+                    return str(file)
+
+    except Exception:
+        pass
+
     for dummy in [PRODUCT_DIR / "dummy_product.png", ASSETS_DIR / "dummy_product.png"]:
         if dummy.exists():
             return str(dummy)
     return None
-
-
 
 def encode_image_for_html(img_path):
     try:
