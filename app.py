@@ -1157,6 +1157,276 @@ def inject_ui_hotfix_css():
 
     @media(max-width:900px){ .method-timeline{ grid-template-columns:repeat(2,1fr) !important; } .method-step::after{ display:none !important; } }
 
+
+
+    /* =========================================================
+       RESPONSIVE + DARK/LIGHT ADAPTIVE PATCH
+       - Membuat UI lebih aman di HP
+       - Menghindari icon/teks hitam hilang saat browser dark mode
+       - Menjaga card tidak overflow di layar kecil
+       ========================================================= */
+    :root{
+        color-scheme: light dark;
+        --sm-bg:#FFF6FA;
+        --sm-bg-soft:#FFF0F5;
+        --sm-card:rgba(255,255,255,.86);
+        --sm-card-solid:#FFFFFF;
+        --sm-text:#2F2330;
+        --sm-muted:#7B6472;
+        --sm-border:rgba(255,168,214,.55);
+        --sm-pink:#F48ABD;
+        --sm-pink-strong:#E7569F;
+        --sm-green:#758952;
+        --sm-green-soft:#EEF3E5;
+        --sm-shadow:0 18px 38px rgba(200,107,133,.12);
+    }
+
+    @media (prefers-color-scheme: dark){
+        :root{
+            --sm-bg:#1E171D;
+            --sm-bg-soft:#271D25;
+            --sm-card:rgba(45,34,43,.92);
+            --sm-card-solid:#2D222B;
+            --sm-text:#F8EEF4;
+            --sm-muted:#D8C5D0;
+            --sm-border:rgba(244,138,189,.45);
+            --sm-pink:#FF9ED0;
+            --sm-pink-strong:#F06BAF;
+            --sm-green:#C8DDA5;
+            --sm-green-soft:#33402B;
+            --sm-shadow:0 18px 38px rgba(0,0,0,.32);
+        }
+    }
+
+    .stApp,
+    [data-testid="stAppViewContainer"]{
+        background:linear-gradient(135deg,var(--sm-bg) 0%, var(--sm-bg-soft) 55%, rgba(117,137,82,.12) 100%) !important;
+        color:var(--sm-text) !important;
+    }
+
+    [data-testid="stSidebar"]{
+        background:linear-gradient(180deg,var(--sm-bg-soft),var(--sm-bg)) !important;
+        border-right:1px solid var(--sm-border) !important;
+    }
+
+    .custom-card,
+    .tip-card,
+    .html-product-card,
+    .pipeline-card,
+    .upload-real-card [data-testid="stFileUploader"],
+    .camera-real-card [data-testid="stCameraInput"],
+    .filters-header-box{
+        background:var(--sm-card) !important;
+        color:var(--sm-text) !important;
+        border-color:var(--sm-border) !important;
+        box-shadow:var(--sm-shadow) !important;
+    }
+
+    .page-title,
+    .hero-title,
+    .brand-name,
+    .sidebar-brand,
+    .html-name,
+    .html-price,
+    .method-title,
+    .step-title,
+    .feature-card h3,
+    .tip-card h3,
+    .custom-card h1,
+    .custom-card h2,
+    .custom-card h3,
+    .stMarkdown h1,
+    .stMarkdown h2,
+    .stMarkdown h3{
+        color:var(--sm-text) !important;
+    }
+
+    .subtitle,
+    .small-text,
+    .html-brand,
+    .html-reason,
+    .sidebar-footer,
+    .stat-label{
+        color:var(--sm-muted) !important;
+    }
+
+    .logo-box,
+    .feature-icon,
+    .upload-symbol,
+    .method-icon,
+    .tech-icon,
+    .tip-emoji,
+    .step-icon{
+        color:var(--sm-text) !important;
+        background:rgba(255,168,214,.24) !important;
+    }
+
+    .chip,
+    .pill,
+    .match-badge{
+        color:var(--sm-text) !important;
+        border-color:var(--sm-border) !important;
+    }
+
+    .swatch{
+        border:1px solid rgba(255,255,255,.45) !important;
+        box-shadow:0 3px 10px rgba(0,0,0,.12) !important;
+    }
+
+    /* Streamlit widget text agar tidak hilang di dark mode */
+    [data-testid="stRadio"] label,
+    [data-testid="stRadio"] p,
+    [data-testid="stFileUploader"] *,
+    [data-testid="stCameraInput"] *,
+    .stButton button,
+    .stDownloadButton button{
+        color:var(--sm-text) !important;
+    }
+
+    .stButton > button[kind="primary"],
+    .stDownloadButton button{
+        background:linear-gradient(135deg,var(--sm-pink),var(--sm-pink-strong)) !important;
+        color:white !important;
+        border:0 !important;
+    }
+
+    .stButton > button[kind="primary"] *,
+    .stDownloadButton button *{
+        color:white !important;
+    }
+
+    /* Dark mode khusus product card */
+    @media (prefers-color-scheme: dark){
+        .html-product-img{
+            background:rgba(255,240,245,.12) !important;
+            border-color:rgba(244,138,189,.35) !important;
+        }
+        .html-bar{
+            background:rgba(255,255,255,.18) !important;
+        }
+        .html-bar > div{
+            background:linear-gradient(90deg,#C8DDA5,#91A56D) !important;
+        }
+    }
+
+    /* ======================= MOBILE LAYOUT ======================= */
+    @media(max-width: 900px){
+        .main .block-container,
+        [data-testid="stMainBlockContainer"]{
+            padding-left:1rem !important;
+            padding-right:1rem !important;
+            max-width:100% !important;
+        }
+
+        .hero{
+            padding:2rem 1rem !important;
+            text-align:center !important;
+        }
+        .hero-title{
+            font-size:2.2rem !important;
+            line-height:1.12 !important;
+        }
+        .page-title{
+            font-size:2rem !important;
+            line-height:1.15 !important;
+        }
+        .subtitle{
+            font-size:.9rem !important;
+        }
+
+        .custom-card,
+        .tip-card,
+        .html-product-card,
+        .filters-header-box{
+            border-radius:1rem !important;
+            padding:1rem !important;
+        }
+
+        .html-product-top{
+            display:grid !important;
+            grid-template-columns:72px 1fr !important;
+            gap:.75rem !important;
+        }
+        .html-product-img{
+            width:68px !important;
+            height:86px !important;
+        }
+        .html-price{
+            grid-column:1 / -1 !important;
+            text-align:left !important;
+            display:flex !important;
+            justify-content:space-between !important;
+            align-items:center !important;
+            gap:.5rem !important;
+            margin-top:.35rem !important;
+            font-size:.9rem !important;
+        }
+        .html-name{
+            font-size:.92rem !important;
+            line-height:1.35 !important;
+        }
+        .match-badge{
+            font-size:.75rem !important;
+            padding:.35rem .55rem !important;
+        }
+
+        .filters-shell [data-testid="stRadio"] div[role="radiogroup"]{
+            gap:.45rem !important;
+        }
+        .filters-shell [data-testid="stRadio"] label{
+            padding:.45rem .75rem !important;
+            font-size:.82rem !important;
+        }
+
+        .method-timeline{
+            grid-template-columns:repeat(2,1fr) !important;
+            gap:1rem !important;
+        }
+        .method-step::after{
+            display:none !important;
+        }
+        .method-step .method-icon{
+            width:46px !important;
+            height:46px !important;
+            font-size:1.25rem !important;
+        }
+
+        .camera-intro-card{
+            padding:.7rem !important;
+        }
+        .camera-real-card [data-testid="stCameraInput"]{
+            min-height:auto !important;
+            padding:.55rem !important;
+        }
+        .camera-real-card [data-testid="stCameraInput"] video,
+        .camera-real-card [data-testid="stCameraInput"] img,
+        .camera-real-card [data-testid="stCameraInput"] canvas{
+            width:100% !important;
+            max-height:none !important;
+        }
+
+        .tip-item{
+            gap:.6rem !important;
+        }
+        .tip-emoji{
+            min-width:28px !important;
+            width:28px !important;
+            height:28px !important;
+            font-size:.9rem !important;
+        }
+    }
+
+    @media(max-width: 520px){
+        .hero-title{ font-size:1.75rem !important; }
+        .page-title{ font-size:1.7rem !important; }
+        .custom-card{ padding:.85rem !important; }
+        .stats-grid{ grid-template-columns:repeat(2,1fr) !important; gap:.7rem !important; }
+        .stat-number{ font-size:1.4rem !important; }
+        .html-product-top{ grid-template-columns:60px 1fr !important; }
+        .html-product-img{ width:58px !important; height:76px !important; }
+        .swatch{ width:28px !important; height:24px !important; }
+    }
+
     #MainMenu, footer, [data-testid="stDecoration"] { visibility:hidden !important; display:none !important; }
     </style>
     """, unsafe_allow_html=True)
