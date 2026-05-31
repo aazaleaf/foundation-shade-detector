@@ -1657,147 +1657,147 @@ def skin_analysis_page(resources):
                     st.session_state["page"] = "Results"
                     st.rerun()
     with right:
-    st.markdown("""
-    <style>
-    .tip-card{
-        background: rgba(255,255,255,.86);
-        border: 1.5px solid rgba(117,137,82,.42);
-        border-radius: 1.35rem;
-        padding: 1.4rem 1.5rem;
-        box-shadow: 0 16px 35px rgba(244,138,189,.10);
-    }
-
-    .tip-card h3{
-        font-family: Inter, sans-serif;
-        margin-top: 0;
-        margin-bottom: 1.1rem;
-        color: #2F2330;
-        font-size: 1.45rem;
-        font-weight: 900;
-    }
-
-    .tip-item{
-        display: flex;
-        align-items: flex-start;
-        gap: 0.8rem;
-        margin-bottom: 1rem;
-    }
-
-    .tip-emoji{
-        width: 34px;
-        min-width: 34px;
-        height: 34px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        line-height: 1;
-        font-size: 1rem;
-        border-radius: 0.75rem;
-        background: rgba(255,168,214,.22);
-        margin-top: 0.18rem;
-    }
-
-    .tip-item strong{
-        display: block;
-        color: #2F2330;
-        font-size: 0.92rem;
-        font-weight: 900;
-        margin-bottom: 0.25rem;
-    }
-
-    .tip-item .small-text{
-        display: block;
-        color: #7B6472;
-        font-size: 0.82rem;
-        line-height: 1.65;
-    }
-
-    .notice{
-        margin-top: 1rem;
-        background: rgba(255,240,245,.82);
-        border: 1.5px solid rgba(255,168,214,.60);
-        border-radius: 1rem;
-        padding: 0.9rem 1rem;
-        color: #5E4A59;
-        font-size: 0.82rem;
-        line-height: 1.5;
-    }
-
-    @media (prefers-color-scheme: dark){
+        st.markdown("""
+        <style>
         .tip-card{
-            background: rgba(40,31,38,.92);
-            border-color: rgba(255,168,214,.35);
+            background: rgba(255,255,255,.86);
+            border: 1.5px solid rgba(117,137,82,.42);
+            border-radius: 1.35rem;
+            padding: 1.4rem 1.5rem;
+            box-shadow: 0 16px 35px rgba(244,138,189,.10);
         }
 
-        .tip-card h3,
-        .tip-item strong{
-            color: #FFF7FB;
+        .tip-card h3{
+            font-family: Inter, sans-serif;
+            margin-top: 0;
+            margin-bottom: 1.1rem;
+            color: #2F2330;
+            font-size: 1.45rem;
+            font-weight: 900;
         }
 
-        .tip-item .small-text,
-        .notice{
-            color: #E8D6E0;
+        .tip-item{
+            display: flex;
+            align-items: flex-start;
+            gap: 0.8rem;
+            margin-bottom: 1rem;
         }
 
         .tip-emoji{
-            background: rgba(255,168,214,.20);
+            width: 34px;
+            min-width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+            font-size: 1rem;
+            border-radius: 0.75rem;
+            background: rgba(255,168,214,.22);
+            margin-top: 0.18rem;
+        }
+
+        .tip-item strong{
+            display: block;
+            color: #2F2330;
+            font-size: 0.92rem;
+            font-weight: 900;
+            margin-bottom: 0.25rem;
+        }
+
+        .tip-item .small-text{
+            display: block;
+            color: #7B6472;
+            font-size: 0.82rem;
+            line-height: 1.65;
         }
 
         .notice{
-            background: rgba(70,45,60,.78);
-            border-color: rgba(255,168,214,.35);
+            margin-top: 1rem;
+            background: rgba(255,240,245,.82);
+            border: 1.5px solid rgba(255,168,214,.60);
+            border-radius: 1rem;
+            padding: 0.9rem 1rem;
+            color: #5E4A59;
+            font-size: 0.82rem;
+            line-height: 1.5;
         }
-    }
-    </style>
 
-    <div class="tip-card">
-        <h3>💡 Photo Tips</h3>
+        @media (prefers-color-scheme: dark){
+            .tip-card{
+                background: rgba(40,31,38,.92);
+                border-color: rgba(255,168,214,.35);
+            }
 
-        <div class="tip-item">
-            <div class="tip-emoji">☀️</div>
-            <div>
-                <strong>Natural Lighting</strong>
-                <span class="small-text">Use daylight or soft indoor light. Avoid flash and harsh shadows.</span>
+            .tip-card h3,
+            .tip-item strong{
+                color: #FFF7FB;
+            }
+
+            .tip-item .small-text,
+            .notice{
+                color: #E8D6E0;
+            }
+
+            .tip-emoji{
+                background: rgba(255,168,214,.20);
+            }
+
+            .notice{
+                background: rgba(70,45,60,.78);
+                border-color: rgba(255,168,214,.35);
+            }
+        }
+        </style>
+
+        <div class="tip-card">
+            <h3>💡 Photo Tips</h3>
+
+            <div class="tip-item">
+                <div class="tip-emoji">☀️</div>
+                <div>
+                    <strong>Natural Lighting</strong>
+                    <span class="small-text">Use daylight or soft indoor light. Avoid flash and harsh shadows.</span>
+                </div>
+            </div>
+
+            <div class="tip-item">
+                <div class="tip-emoji">🚫</div>
+                <div>
+                    <strong>No Filters</strong>
+                    <span class="small-text">Upload the original photo without any color filters or edits.</span>
+                </div>
+            </div>
+
+            <div class="tip-item">
+                <div class="tip-emoji">👤</div>
+                <div>
+                    <strong>Face Visible</strong>
+                    <span class="small-text">Your face should be clearly visible and centered in the frame.</span>
+                </div>
+            </div>
+
+            <div class="tip-item">
+                <div class="tip-emoji">📐</div>
+                <div>
+                    <strong>Straight Angle</strong>
+                    <span class="small-text">Face the camera directly for best skin tone extraction.</span>
+                </div>
+            </div>
+
+            <div class="tip-item">
+                <div class="tip-emoji">💄</div>
+                <div>
+                    <strong>Minimal Makeup</strong>
+                    <span class="small-text">Less makeup gives more accurate skin color readings.</span>
+                </div>
             </div>
         </div>
 
-        <div class="tip-item">
-            <div class="tip-emoji">🚫</div>
-            <div>
-                <strong>No Filters</strong>
-                <span class="small-text">Upload the original photo without any color filters or edits.</span>
-            </div>
+        <div class="notice">
+            🔒 <strong>Your privacy matters.</strong> Photos are processed locally and are not stored or shared.
         </div>
-
-        <div class="tip-item">
-            <div class="tip-emoji">👤</div>
-            <div>
-                <strong>Face Visible</strong>
-                <span class="small-text">Your face should be clearly visible and centered in the frame.</span>
-            </div>
-        </div>
-
-        <div class="tip-item">
-            <div class="tip-emoji">📐</div>
-            <div>
-                <strong>Straight Angle</strong>
-                <span class="small-text">Face the camera directly for best skin tone extraction.</span>
-            </div>
-        </div>
-
-        <div class="tip-item">
-            <div class="tip-emoji">💄</div>
-            <div>
-                <strong>Minimal Makeup</strong>
-                <span class="small-text">Less makeup gives more accurate skin color readings.</span>
-            </div>
-        </div>
-    </div>
-
-    <div class="notice">
-        🔒 <strong>Your privacy matters.</strong> Photos are processed locally and are not stored or shared.
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
 
 
