@@ -1635,7 +1635,7 @@ def skin_analysis_page(resources):
                     st.image(cam, caption="Captured photo", use_container_width=True)
         if st.button("Analyze Now  →", type="primary", use_container_width=True):
             if image_source is None:
-                st.warning("Upload atau ambil foto dulu ya.")
+                st.warning("upload or take a photo first")
             else:
                 file_bytes = np.frombuffer(image_source.getvalue(), dtype=np.uint8)
                 img_bgr = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
