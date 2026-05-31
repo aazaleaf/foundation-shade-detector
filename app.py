@@ -1658,38 +1658,37 @@ def skin_analysis_page(resources):
                     st.rerun()
     with right:
         st.markdown("""
-        <div class="tip-card">
-            <h3 style="font-family:Inter;margin-top:0;">💡 Photo Tips</h3>
-            
-            <div class="tip-item" style="display: flex; align-items: center;">
-                <div class="tip-emoji">☀️</div>
-                <div><strong>Natural Lighting</strong><br><span class="small-text">Use daylight or soft indoor light. Avoid flash and harsh shadows.</span></div>
-            </div>
-            
-            <div class="tip-item" style="display: flex; align-items: center;">
-                <div class="tip-emoji">🚫</div>
-                <div><strong>No Filters</strong><br><span class="small-text">Upload the original photo without any color filters or edits.</span></div>
-            </div>
-            
-            <div class="tip-item" style="display: flex; align-items: center;">
-                <div class="tip-emoji">👤</div>
-                <div><strong>Face Visible</strong><br><span class="small-text">Your face should be clearly visible and centered in the frame.</span></div>
-            </div>
-            
-            <div class="tip-item" style="display: flex; align-items: center;">
-                <div class="tip-emoji">📐</div>
-                <div><strong>Straight Angle</strong><br><span class="small-text">Face the camera directly for best skin tone extraction.</span></div>
-            </div>
-            
-            <div class="tip-item" style="display: flex; align-items: center;">
-                <div class="tip-emoji">💄</div>
-                <div><strong>Minimal Makeup</strong><br><span class="small-text">Less makeup gives more accurate skin color readings.</span></div>
-            </div>
-            
-        </div>
-        <div class="notice">🔒 <strong>Your privacy matters.</strong> Photos are processed locally and are not stored or shared.</div>
-        """, unsafe_allow_html=True)
-
+<div class="tip-card">
+    <h3 style="font-family:Inter;margin-top:0;">💡 Photo Tips</h3>
+    
+    <div class="tip-item" style="display: flex; align-items: center;">
+        <div class="tip-emoji">☀️</div>
+        <div><strong>Natural Lighting</strong><br><span class="small-text">Use daylight or soft indoor light. Avoid flash and harsh shadows.</span></div>
+    </div>
+    
+    <div class="tip-item" style="display: flex; align-items: center;">
+        <div class="tip-emoji">🚫</div>
+        <div><strong>No Filters</strong><br><span class="small-text">Upload the original photo without any color filters or edits.</span></div>
+    </div>
+    
+    <div class="tip-item" style="display: flex; align-items: center;">
+        <div class="tip-emoji">👤</div>
+        <div><strong>Face Visible</strong><br><span class="small-text">Your face should be clearly visible and centered in the frame.</span></div>
+    </div>
+    
+    <div class="tip-item" style="display: flex; align-items: center;">
+        <div class="tip-emoji">📐</div>
+        <div><strong>Straight Angle</strong><br><span class="small-text">Face the camera directly for best skin tone extraction.</span></div>
+    </div>
+    
+    <div class="tip-item" style="display: flex; align-items: center;">
+        <div class="tip-emoji">💄</div>
+        <div><strong>Minimal Makeup</strong><br><span class="small-text">Less makeup gives more accurate skin color readings.</span></div>
+    </div>
+    
+</div>
+<div class="notice">🔒 <strong>Your privacy matters.</strong> Photos are processed locally and are not stored or shared.</div>
+""", unsafe_allow_html=True)
 
 
 def results_page():
