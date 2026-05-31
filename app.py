@@ -1703,7 +1703,6 @@ def results_page():
             st.session_state["page"] = "Skin Analysis"
             st.rerun()
         return
-
     skin_hex = result.get("skin_hex", "#C4956A")
     user_skintone = result.get("user_skintone", "-")
     user_undertone = result.get("user_undertone", "-")
@@ -1712,126 +1711,45 @@ def results_page():
     lab = result.get("cielab", {"L": 0, "a": 0, "b": 0})
     rgb_tuple = tuple(int(x) for x in ImageColor_get_rgb(skin_hex))
     display_skintone = "Medium Beige" if str(user_skintone).lower() == "medium" else user_skintone
-
     st.markdown('<span class="pill green">Step 2 of 3</span> <span class="pill green">✓ Analysis Complete</span>', unsafe_allow_html=True)
     st.markdown('<h1 class="page-title">Analysis Results</h1>', unsafe_allow_html=True)
     st.markdown('<div class="subtitle" style="margin:0 0 1.2rem;max-width:760px;">Here’s what we found from your photo.</div>', unsafe_allow_html=True)
+    main, side = st.columns([2.2, 1], gap="large")
+    with main:
+        cards = [("🌸 Skin Tone", display_skintone, "Fitzpatrick scale approximation", "#D94E91"), ("🍃 Undertone", user_undertone, "Golden–yellow hue bias detected" if user_undertone == "Warm" else "Estimated from CIELAB a* and b*", "#758952"), ("▥ MST Score", f"MST-{mst}", "Monk Skin Tone Scale", "#A66BCF"), ("✨ Confidence", f"{confidence}%", "Model prediction confidence", "#F28C43")]
+        for i in range(0,4,2):
+            cols = st.columns(2)
+            for col, (label, value, sub, color) in zip(cols, cards[i:i+2]):
+                with col:
+                    st.markdown(f'<div class="metric-card" style="margin-bottom:1rem;"><div class="metric-label" style="color:{color};">{label}</div><div class="metric-value">{value}</div><div class="small-text">{sub}</div></div>', unsafe_allow_html=True)
+        mst_items = ""
+        for i, color in MST_COLORS.items():
+            match = "match" if i == mst else ""
+            bubble = '<div class="match-label">Your Match</div>' if i == mst else ""
+            label_color = "#F48ABD" if i == mst else "#7B6472"
+            weight = "900" if i == mst else "700"
+            mst_items += f'<div class="mst-item {match}">{bubble}<div class="mst-color" style="background:{color};"></div><div style="font-size:.78rem;margin-top:.45rem;color:{label_color};font-weight:{weight};">MST-{i}</div></div>'
+        st.markdown(f'<div class="custom-card" style="padding:1.6rem;margin-top:.1rem;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;"><strong>Prediction Confidence</strong><strong style="color:#F48ABD;font-size:1.25rem;">{confidence}%</strong></div><div class="progress-track"><div class="progress-fill pink" style="width:{confidence}%;"></div></div><div style="display:flex;justify-content:space-between;color:#7B6472;font-size:.8rem;margin-top:.45rem;"><span>0%</span><span>100%</span></div><div style="margin-top:1.5rem;margin-bottom:.75rem;color:#7B6472;">Monk Skin Tone Scale</div><div class="mst-strip">{mst_items}</div><div style="text-align:center;color:#F48ABD;font-weight:900;margin-top:.9rem;">←──── MST-{mst} (Your Tone) ────→</div></div>', unsafe_allow_html=True)
+        st.markdown(f"""<div class="custom-card result-card" style="padding:1.4rem;margin-top:1rem;"><strong>Color Space Analysis</strong><div class="color-grid"><div class="pink-tint color-box"><div class="metric-label">HEX</div><div class="small-text">Detected</div><strong class="color-hex-value">{skin_hex}</strong></div><div class="pink-tint color-box"><div class="metric-label">RGB</div><div>R <strong style="float:right;">{rgb_tuple[0]}</strong></div><div>G <strong style="float:right;">{rgb_tuple[1]}</strong></div><div>B <strong style="float:right;">{rgb_tuple[2]}</strong></div></div><div class="pink-tint color-box"><div class="metric-label">LAB</div><div>L* <strong style="float:right;">{lab.get('L')}</strong></div><div>a* <strong style="float:right;">{lab.get('a')}</strong></div><div>b* <strong style="float:right;">{lab.get('b')}</strong></div></div></div></div>""", unsafe_allow_html=True)
+        st.markdown('<div style="height:1rem;"></div>', unsafe_allow_html=True)
+        if st.button("View Foundation Recommendations  →", type="primary", use_container_width=True, key="view_recommendation_from_results"):
+            st.session_state["page"] = "Recommendations"
+            st.rerun()
+    with side:
+        with st.container(border=True):
+            st.markdown('<strong>Preview Photo</strong>', unsafe_allow_html=True)
+            preview = st.session_state.get("last_input_image", result.get("vis_frame", None))
+            if preview is not None:
+                st.markdown('<div class="analysis-preview-img" style="margin:.55rem 0 .75rem;">', unsafe_allow_html=True)
+                st.image(preview, use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown(f'<strong>Detected Skin Color</strong><div class="detected-skin-swatch" style="height:76px;background:{skin_hex};margin:.65rem 0 .75rem;"></div><div style="text-align:center;"><span class="pill" style="letter-spacing:0;text-transform:none;white-space:nowrap;">{skin_hex}</span><div class="small-text" style="margin-top:.42rem;">{display_skintone}</div></div>', unsafe_allow_html=True)
+        st.markdown('<div style="height:.75rem;"></div>', unsafe_allow_html=True)
+        if st.button("📷 Re-analyze Photo", use_container_width=True, key="reanalyze_photo_results"):
+            st.session_state["page"] = "Skin Analysis"
+            st.rerun()
+        st.markdown(f'<div class="custom-card result-about-card" style="padding:1.35rem;margin-top:.75rem;"><strong>ⓘ About Your Result</strong><div class="pink-tint" style="border-radius:.9rem;padding:1rem;margin-top:1rem;"><strong style="color:#F48ABD;">{user_undertone} Undertone</strong><div class="small-text">Foundation shades with matching undertone labels will complement your detected skin color better.</div></div><div class="green-tint" style="border-radius:.9rem;padding:1rem;margin-top:.75rem;"><strong style="color:#758952;">Best Finishes</strong><div class="small-text">Dewy and satin finishes often enhance the result with a natural radiance.</div></div></div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="custom-card result-preview-card"><strong>Preview Photo</strong>', unsafe_allow_html=True)
-    preview = st.session_state.get("last_input_image", result.get("vis_frame", None))
-    if preview is not None:
-        st.markdown('<div class="analysis-preview-img">', unsafe_allow_html=True)
-        st.image(preview, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown(
-        f'''
-        <strong>Detected Skin Color</strong>
-        <div class="detected-skin-swatch" style="background:{skin_hex};"></div>
-        <div style="text-align:center;">
-            <span class="pill" style="letter-spacing:0;text-transform:none;white-space:nowrap;">{skin_hex}</span>
-            <div class="small-text" style="margin-top:.45rem;">{display_skintone}</div>
-        </div>
-        </div>
-        ''',
-        unsafe_allow_html=True,
-    )
-
-    if st.button("📷 Re-analyze Photo", use_container_width=True):
-        st.session_state["page"] = "Skin Analysis"
-        st.rerun()
-
-    st.markdown('<div class="result-section-title">Analysis Result</div>', unsafe_allow_html=True)
-    cards = [
-        ("🌸 Skin Tone", display_skintone, "Fitzpatrick scale approximation", "#D94E91"),
-        ("🍃 Undertone", user_undertone, "Golden–yellow hue bias detected" if user_undertone == "Warm" else "Estimated from CIELAB a* and b*", "#758952"),
-        ("▥ MST Score", f"MST-{mst}", "Monk Skin Tone Scale", "#A66BCF"),
-        ("✨ Confidence", f"{confidence}%", "Model prediction confidence", "#F28C43"),
-    ]
-    cards_html = '<div class="result-grid">'
-    for label, value, sub, color in cards:
-        cards_html += f'''
-        <div class="metric-card">
-            <div class="metric-label" style="color:{color};">{label}</div>
-            <div class="metric-value">{value}</div>
-            <div class="small-text metric-sub">{sub}</div>
-        </div>
-        '''
-    cards_html += '</div>'
-    st.markdown(cards_html, unsafe_allow_html=True)
-
-    mst_items = ""
-    for i, color in MST_COLORS.items():
-        match = "match" if i == mst else ""
-        bubble = '<div class="match-label">Your Match</div>' if i == mst else ""
-        label_color = "#F48ABD" if i == mst else "var(--sm-muted)"
-        weight = "900" if i == mst else "700"
-        mst_items += f'<div class="mst-item {match}">{bubble}<div class="mst-color" style="background:{color};"></div><div style="font-size:.78rem;margin-top:.45rem;color:{label_color};font-weight:{weight};">MST-{i}</div></div>'
-    st.markdown(
-        f'''
-        <div class="custom-card result-card" style="padding:1.6rem;margin-top:.15rem;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;gap:1rem;">
-                <strong>Prediction Confidence</strong>
-                <strong style="color:#F48ABD;font-size:1.25rem;">{confidence}%</strong>
-            </div>
-            <div class="progress-track"><div class="progress-fill pink" style="width:{confidence}%;"></div></div>
-            <div class="result-card-muted" style="display:flex;justify-content:space-between;font-size:.8rem;margin-top:.45rem;"><span>0%</span><span>100%</span></div>
-            <div class="result-card-muted" style="margin-top:1.5rem;margin-bottom:.75rem;">Monk Skin Tone Scale</div>
-            <div class="mst-strip">{mst_items}</div>
-            <div style="text-align:center;color:#F48ABD;font-weight:900;margin-top:.9rem;">←──── MST-{mst} (Your Tone) ────→</div>
-        </div>
-        ''',
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        f'''
-        <div class="custom-card result-card" style="padding:1.4rem;margin-top:1rem;">
-            <strong>Color Space Analysis</strong>
-            <div class="color-grid">
-                <div class="pink-tint color-box">
-                    <div class="metric-label">HEX</div>
-                    <div class="small-text">Detected</div>
-                    <strong class="color-hex-value">{skin_hex}</strong>
-                </div>
-                <div class="pink-tint color-box">
-                    <div class="metric-label">RGB</div>
-                    <div>R <strong style="float:right;">{rgb_tuple[0]}</strong></div>
-                    <div>G <strong style="float:right;">{rgb_tuple[1]}</strong></div>
-                    <div>B <strong style="float:right;">{rgb_tuple[2]}</strong></div>
-                </div>
-                <div class="pink-tint color-box">
-                    <div class="metric-label">LAB</div>
-                    <div>L* <strong style="float:right;">{lab.get('L')}</strong></div>
-                    <div>a* <strong style="float:right;">{lab.get('a')}</strong></div>
-                    <div>b* <strong style="float:right;">{lab.get('b')}</strong></div>
-                </div>
-            </div>
-        </div>
-        ''',
-        unsafe_allow_html=True,
-    )
-
-    st.markdown('<div class="result-button-spacer"></div>', unsafe_allow_html=True)
-    if st.button("View Foundation Recommendations  →", type="primary", use_container_width=True):
-        st.session_state["page"] = "Recommendations"
-        st.rerun()
-
-    st.markdown(
-        f'''
-        <div class="custom-card result-about-card" style="padding:1.35rem;margin-top:1rem;">
-            <strong>ⓘ About Your Result</strong>
-            <div class="pink-tint" style="border-radius:.9rem;padding:1rem;margin-top:1rem;">
-                <strong style="color:#F48ABD !important;">{user_undertone} Undertone</strong>
-                <div class="small-text">Foundation shades with matching undertone labels will complement your detected skin color better.</div>
-            </div>
-            <div class="green-tint" style="border-radius:.9rem;padding:1rem;margin-top:.75rem;">
-                <strong style="color:#758952 !important;">Best Finishes</strong>
-                <div class="small-text">Dewy and satin finishes often enhance the result with a natural radiance.</div>
-            </div>
-        </div>
-        ''',
-        unsafe_allow_html=True,
-    )
 
 
 def recommendations_page():
