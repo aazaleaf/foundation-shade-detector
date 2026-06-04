@@ -343,14 +343,11 @@ def predict_mst_hybrid(feats, ensemble, scaler, kmeans, centroids, feature_cols,
 # ─────────────────────────────────────────────
 def recommend_foundation(mst_pred, L, a, b, df_found, top_n=5):
     """
-    Rekomendasi foundation dengan aturan:
-    1. Top recommendation tetap berdasarkan Delta E terbaik dan tidak mempertimbangkan harga.
-    2. Semua rekomendasi diusahakan memiliki undertone yang sama dengan top recommendation.
-    3. Nomor 2 tetap mengejar match terbaik berikutnya dan diusahakan tidak lebih mahal dari nomor 1.
-    4. Nomor 3-5 memprioritaskan brand selain brand nomor 1 dan 2,
-       dengan prioritas MST pengguna lalu MST sekitar, lalu fallback.
-    5. Nomor 3-5 diurutkan mengikuti harga dari lebih mahal ke lebih murah,
-       tetapi diusahakan tidak lebih mahal dari rekomendasi sebelumnya.
+    Aturan rekomendasi terbaru:
+    1. Semua rekomendasi harus berasal dari brand yang berbeda.
+    2. Kandidat tetap mempertimbangkan kecocokan warna (Delta E), undertone, dan kedekatan MST.
+    3. Dari tiap brand, dipilih shade terbaik terlebih dahulu.
+    4. Hasil akhir diurutkan dari harga termahal ke termurah.
     """
     df = df_found.copy()
 
@@ -359,7 +356,7 @@ def recommend_foundation(mst_pred, L, a, b, df_found, top_n=5):
     except Exception:
         mst_pred = 5
 
-    # Hitung Delta E / jarak warna CIELAB antara shade foundation dan warna kulit user
+    # Delta E / jarak warna CIELAB
     df["delta_e"] = np.sqrt(
         (df["lab_L"] - L) ** 2 +
         (df["lab_a"] - a) ** 2 +
@@ -381,191 +378,95 @@ def recommend_foundation(mst_pred, L, a, b, df_found, top_n=5):
         except Exception:
             return np.nan
 
+    def _normalize_undertone(value):
+        try:
+            s = str(value).strip().lower()
+        except Exception:
+            return ""
+        if "warm" in s:
+            return "warm"
+        if "cool" in s:
+            return "cool"
+        if "neutral" in s:
+            return "neutral"
+        return s
+
     df["price_num"] = df["Price"].apply(_price_num)
     df["brand_norm"] = df["Brand"].astype(str).str.strip().str.lower()
-    df["undertone_norm"] = df["Undertone"].astype(str).str.strip().str.lower()
+    df["undertone_norm"] = df["Undertone"].apply(_normalize_undertone)
+    df["mst_distance"] = (df["mst_id"] - mst_pred).abs()
 
+    # Estimasi undertone user dari nilai LAB hasil analisis
+    user_undertone = _normalize_undertone(estimate_user_undertone(a, b))
+    df["undertone_match"] = (df["undertone_norm"] == user_undertone).astype(int)
+
+    # Hindari duplikasi shade yang persis sama
     subset_cols = [c for c in ["Brand", "Product", "Shade"] if c in df.columns]
     if subset_cols:
         df = df.drop_duplicates(subset=subset_cols, keep="first")
 
-    exact_mst = df[df["mst_id"] == mst_pred].copy()
-    around_mst = df[
-        (df["mst_id"].isin([mst_pred - 1, mst_pred + 1])) &
-        (df["mst_id"] != mst_pred)
-    ].copy()
-    outside_mst = df[
-        ~df["mst_id"].isin([mst_pred - 1, mst_pred, mst_pred + 1])
-    ].copy()
-    primary_pool = pd.concat([exact_mst, around_mst], ignore_index=True)
+    # Tahap prioritas kualitas match.
+    # Tujuannya: pilih SATU shade terbaik dari tiap brand terlebih dahulu.
+    stages = [
+        df[(df["undertone_match"] == 1) & (df["mst_distance"] == 0)].copy(),
+        df[(df["undertone_match"] == 1) & (df["mst_distance"] <= 1)].copy(),
+        df[(df["undertone_match"] == 1)].copy(),
+        df[(df["undertone_match"] == 0) & (df["mst_distance"] == 0)].copy(),
+        df[(df["undertone_match"] == 0) & (df["mst_distance"] <= 1)].copy(),
+        df.copy(),
+    ]
 
-    selected_rows = []
-    selected_keys = set()
+    selected_by_brand = {}
 
-    def _row_key(row):
-        return (
-            str(row.get("Brand", "")).strip().lower(),
-            str(row.get("Product", "")).strip().lower(),
-            str(row.get("Shade", "")).strip().lower(),
+    def _candidate_sort(pool):
+        if pool.empty:
+            return pool
+        return pool.sort_values(
+            by=["undertone_match", "mst_distance", "delta_e", "price_num"],
+            ascending=[False, True, True, False],
+            na_position='last'
         )
 
-    def _add_row(row):
-        key = _row_key(row)
-        if key in selected_keys:
-            return False
-        selected_rows.append(row.copy())
-        selected_keys.add(key)
-        return True
-
-    def _available(data):
-        if data is None or len(data) == 0:
-            return pd.DataFrame()
-        data = data.copy()
-        if not selected_keys:
-            return data
-        return data[~data.apply(lambda r: _row_key(r) in selected_keys, axis=1)]
-
-    def _filter_not_more_expensive(pool, prev_price):
-        if pool.empty or pd.isna(prev_price):
-            return pool
-        price_safe = pool[
-            (pool["price_num"].isna()) |
-            (pool["price_num"] <= prev_price)
-        ].copy()
-        return price_safe if not price_safe.empty else pool
-
-    def _prefer_same_undertone(pool, preferred_undertone):
-        if pool.empty or not preferred_undertone:
-            return pool
-        same = pool[pool["undertone_norm"] == preferred_undertone].copy()
-        return same if not same.empty else pool
-
-    def _sort_best_match(pool):
-        if pool.empty:
-            return pool
-        return pool.sort_values(by=["delta_e", "price_num"], ascending=[True, True])
-
-    # =========================================================
-    # 1. TOP RECOMMENDATION: Delta E terbaik, tanpa melihat harga
-    # =========================================================
-    top1_pool = _sort_best_match(exact_mst)
-    if top1_pool.empty:
-        top1_pool = _sort_best_match(primary_pool)
-    if top1_pool.empty:
-        top1_pool = _sort_best_match(df)
-
-    if not top1_pool.empty:
-        _add_row(top1_pool.iloc[0])
-
-    preferred_undertone = ""
-    if selected_rows:
-        preferred_undertone = str(selected_rows[0].get("undertone_norm", "")).strip().lower()
-
-    # =========================================================
-    # 2. Nomor 2: match terbaik berikutnya, usahakan undertone sama,
-    #    brand HARUS berbeda dari nomor 1, dan jika memungkinkan harga <= nomor 1
-    # =========================================================
-    if len(selected_rows) < top_n:
-        prev_price = selected_rows[-1].get("price_num", np.nan) if selected_rows else np.nan
-        top1_brand = (
-            str(selected_rows[0].get("brand_norm", "")).strip().lower()
-            if selected_rows else ""
-        )
-
-        top2_pool = _available(primary_pool)
-
-        # Brand nomor 2 tidak boleh sama dengan brand nomor 1
-        if top1_brand:
-            top2_pool = top2_pool[top2_pool["brand_norm"] != top1_brand].copy()
-
-        top2_pool = _prefer_same_undertone(top2_pool, preferred_undertone)
-        top2_pool = _filter_not_more_expensive(top2_pool, prev_price)
-        top2_pool = _sort_best_match(top2_pool)
-
-        if top2_pool.empty:
-            top2_pool = _available(df)
-
-            # Tetap paksa brand nomor 2 berbeda dari brand nomor 1
-            if top1_brand:
-                top2_pool = top2_pool[top2_pool["brand_norm"] != top1_brand].copy()
-
-            top2_pool = _prefer_same_undertone(top2_pool, preferred_undertone)
-            top2_pool = _filter_not_more_expensive(top2_pool, prev_price)
-            top2_pool = _sort_best_match(top2_pool)
-
-        if not top2_pool.empty:
-            _add_row(top2_pool.iloc[0])
-
-    # Brand nomor 1 dan 2 dihindari untuk rekomendasi nomor 3-5
-    top_brands = {
-        str(row.get("brand_norm", "")).strip().lower()
-        for row in selected_rows[:2]
-    }
-
-    def _pick_diverse_by_price(pool, prev_price, preferred_undertone=""):
-        pool = _available(pool)
-        if pool.empty:
-            return None
-
-        # Untuk nomor 3-5, hindari brand yang sudah muncul pada nomor 1 dan 2
-        pool = pool[~pool["brand_norm"].isin(top_brands)].copy()
-        if pool.empty:
-            return None
-
-        pool = _prefer_same_undertone(pool, preferred_undertone)
-        pool = _filter_not_more_expensive(pool, prev_price)
-        pool["price_sort"] = pool["price_num"].fillna(-1)
-
-        # Untuk rekomendasi 3-5: harga besar ke kecil, lalu Delta E kecil ke besar
-        pool = pool.sort_values(by=["price_sort", "delta_e"], ascending=[False, True])
-        return None if pool.empty else pool.iloc[0]
-
-    # =========================================================
-    # 3. Nomor 3-5: undertone sama diusahakan, brand berbeda,
-    #    exact MST -> around MST -> outside MST
-    # =========================================================
-    while len(selected_rows) < top_n:
-        prev_price = selected_rows[-1].get("price_num", np.nan) if selected_rows else np.nan
-
-        picked = _pick_diverse_by_price(exact_mst, prev_price, preferred_undertone)
-        if picked is None:
-            picked = _pick_diverse_by_price(around_mst, prev_price, preferred_undertone)
-        if picked is None:
-            picked = _pick_diverse_by_price(outside_mst, prev_price, preferred_undertone)
-
-        # Jika undertone yang sama benar-benar tidak tersedia, longgarkan undertone
-        if picked is None:
-            picked = _pick_diverse_by_price(exact_mst, prev_price, preferred_undertone="")
-        if picked is None:
-            picked = _pick_diverse_by_price(around_mst, prev_price, preferred_undertone="")
-        if picked is None:
-            picked = _pick_diverse_by_price(outside_mst, prev_price, preferred_undertone="")
-
-        if picked is None:
+    for stage in stages:
+        if stage.empty:
+            continue
+        ordered = _candidate_sort(stage)
+        for _, row in ordered.iterrows():
+            brand_key = str(row.get("brand_norm", "")).strip().lower()
+            if not brand_key:
+                continue
+            if brand_key not in selected_by_brand:
+                selected_by_brand[brand_key] = row
+        if len(selected_by_brand) >= top_n:
             break
 
-        _add_row(picked)
+    # Fallback tambahan jika brand unik masih kurang
+    if len(selected_by_brand) < top_n:
+        ordered_all = _candidate_sort(df)
+        for _, row in ordered_all.iterrows():
+            brand_key = str(row.get("brand_norm", "")).strip().lower()
+            if not brand_key:
+                continue
+            if brand_key not in selected_by_brand:
+                selected_by_brand[brand_key] = row
+            if len(selected_by_brand) >= top_n:
+                break
 
-    # =========================================================
-    # Fallback: jika kandidat tidak cukup, isi dengan kandidat terbaik tersisa
-    # =========================================================
-    while len(selected_rows) < top_n:
-        prev_price = selected_rows[-1].get("price_num", np.nan) if selected_rows else np.nan
-        fallback_pool = _available(df)
-        if fallback_pool.empty:
-            break
+    if not selected_by_brand:
+        return df.head(top_n).reset_index(drop=True)
 
-        fallback_pool = _prefer_same_undertone(fallback_pool, preferred_undertone)
-        fallback_pool = _filter_not_more_expensive(fallback_pool, prev_price)
-        fallback_pool = fallback_pool.sort_values(by=["delta_e", "price_num"], ascending=[True, False])
-        if fallback_pool.empty:
-            break
+    result = pd.DataFrame(list(selected_by_brand.values())).copy()
 
-        _add_row(fallback_pool.iloc[0])
+    # Urutan akhir sesuai permintaan user:
+    # harga termahal -> termurah, sambil tetap mempertahankan kualitas match sebagai tie-breaker.
+    result["price_sort"] = result["price_num"].fillna(-1)
+    result = result.sort_values(
+        by=["price_sort", "undertone_match", "mst_distance", "delta_e"],
+        ascending=[False, False, True, True],
+        na_position='last'
+    ).head(top_n).reset_index(drop=True)
 
-    result = pd.DataFrame(selected_rows).head(top_n).reset_index(drop=True)
-
-    helper_cols = ["price_num", "brand_norm", "undertone_norm", "price_sort"]
+    helper_cols = ["price_num", "brand_norm", "undertone_norm", "mst_distance", "undertone_match", "price_sort"]
     result = result.drop(columns=[c for c in helper_cols if c in result.columns], errors="ignore")
 
     return result
@@ -2119,7 +2020,7 @@ def recommendations_page():
     if str(display_skintone).lower() == "medium": display_skintone = "Medium Beige"
     st.markdown('<div class="pill">Step 3 of 3</div>', unsafe_allow_html=True)
     st.markdown('<h1 class="page-title">Foundation Recommendations</h1>', unsafe_allow_html=True)
-    st.markdown('<div class="subtitle" style="margin:0 0 1.1rem;max-width:760px;">Showing shades matched to your skin tone • Sorted by similarity</div>', unsafe_allow_html=True)
+    st.markdown('<div class="subtitle" style="margin:0 0 1.1rem;max-width:760px;">Showing unique-brand shades matched by color and undertone • Sorted by price (high to low)</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="custom-card" style="padding:1.2rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1rem;"><div style="display:flex;align-items:center;gap:1rem;"><div class="swatch" style="background:{skin_hex};width:64px;height:64px;"></div><div><div class="small-text">Your detected skin color</div><div style="font-weight:900;font-size:1.15rem;">{display_skintone} · {result.get("user_undertone","-")} Undertone · MST-{mst_pred}</div><div class="small-text">{skin_hex}</div></div></div></div>', unsafe_allow_html=True)
     st.markdown('<div class="filters-header-box"><strong style="font-size:1.05rem;">Filters</strong></div>', unsafe_allow_html=True)
     st.markdown('<div class="filters-shell">', unsafe_allow_html=True)
