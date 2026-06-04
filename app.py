@@ -344,23 +344,13 @@ def predict_mst_hybrid(feats, ensemble, scaler, kmeans, centroids, feature_cols,
 def recommend_foundation(mst_pred, L, a, b, df_found, top_n=5):
     """
     Rekomendasi foundation dengan aturan:
-    1. Nomor 1 / Main Recommendation:
-       - Tetap berdasarkan kecocokan warna terbaik, yaitu Delta E terkecil.
-       - Tidak mempertimbangkan harga.
-       - Prioritas MST pengguna, lalu MST sekitar, lalu seluruh data.
-
-    2. Nomor 2:
-       - Masih berdasarkan kecocokan warna terbaik berikutnya.
-       - Brand boleh sama atau berbeda.
-       - Jika memungkinkan, harga tidak lebih mahal dari nomor 1.
-
-    3. Nomor 3 sampai 5:
-       - Mengutamakan brand selain brand yang muncul di nomor 1 dan 2.
-       - Tetap mencari dari MST pengguna terlebih dahulu.
-       - Jika tidak cukup, baru mengambil dari MST sekitar pengguna.
-       - Jika masih tidak cukup, baru mengambil dari luar MST sekitar.
-       - Diurutkan berdasarkan harga dari termahal ke termurah.
-       - Harga rekomendasi berikutnya diusahakan tidak lebih mahal dari nomor sebelumnya.
+    1. Top recommendation tetap berdasarkan Delta E terbaik dan tidak mempertimbangkan harga.
+    2. Semua rekomendasi diusahakan memiliki undertone yang sama dengan top recommendation.
+    3. Nomor 2 tetap mengejar match terbaik berikutnya dan diusahakan tidak lebih mahal dari nomor 1.
+    4. Nomor 3-5 memprioritaskan brand selain brand nomor 1 dan 2,
+       dengan prioritas MST pengguna lalu MST sekitar, lalu fallback.
+    5. Nomor 3-5 diurutkan mengikuti harga dari lebih mahal ke lebih murah,
+       tetapi diusahakan tidak lebih mahal dari rekomendasi sebelumnya.
     """
     df = df_found.copy()
 
@@ -376,38 +366,29 @@ def recommend_foundation(mst_pred, L, a, b, df_found, top_n=5):
         (df["lab_b"] - b) ** 2
     )
 
-    # Ubah harga menjadi angka agar bisa diurutkan dan dibandingkan
     def _price_num(value):
         try:
             if pd.isna(value):
                 return np.nan
-
-            # Kalau sudah numerik, langsung pakai
             if isinstance(value, (int, float, np.integer, np.floating)):
                 return float(value)
-
             s = str(value).lower().strip()
             s = s.replace("rp", "").replace("idr", "").strip()
             s = s.replace(",00", "")
             s = s.replace(".", "").replace(",", "")
             digits = "".join(ch for ch in s if ch.isdigit())
-
-            if digits == "":
-                return np.nan
-
-            return float(digits)
+            return float(digits) if digits else np.nan
         except Exception:
             return np.nan
 
     df["price_num"] = df["Price"].apply(_price_num)
     df["brand_norm"] = df["Brand"].astype(str).str.strip().str.lower()
+    df["undertone_norm"] = df["Undertone"].astype(str).str.strip().str.lower()
 
-    # Hindari shade duplikat persis
     subset_cols = [c for c in ["Brand", "Product", "Shade"] if c in df.columns]
     if subset_cols:
         df = df.drop_duplicates(subset=subset_cols, keep="first")
 
-    # Prioritas MST
     exact_mst = df[df["mst_id"] == mst_pred].copy()
     around_mst = df[
         (df["mst_id"].isin([mst_pred - 1, mst_pred + 1])) &
@@ -432,7 +413,7 @@ def recommend_foundation(mst_pred, L, a, b, df_found, top_n=5):
         key = _row_key(row)
         if key in selected_keys:
             return False
-        selected_rows.append(row)
+        selected_rows.append(row.copy())
         selected_keys.add(key)
         return True
 
@@ -445,89 +426,105 @@ def recommend_foundation(mst_pred, L, a, b, df_found, top_n=5):
         return data[~data.apply(lambda r: _row_key(r) in selected_keys, axis=1)]
 
     def _filter_not_more_expensive(pool, prev_price):
-        """Usahakan harga tidak naik dari rekomendasi sebelumnya."""
         if pool.empty or pd.isna(prev_price):
             return pool
-
         price_safe = pool[
             (pool["price_num"].isna()) |
             (pool["price_num"] <= prev_price)
         ].copy()
-
-        # Kalau ada kandidat yang memenuhi aturan harga, gunakan itu.
-        # Kalau tidak ada, kembalikan pool awal supaya rekomendasi tetap tidak kosong.
         return price_safe if not price_safe.empty else pool
+
+    def _prefer_same_undertone(pool, preferred_undertone):
+        if pool.empty or not preferred_undertone:
+            return pool
+        same = pool[pool["undertone_norm"] == preferred_undertone].copy()
+        return same if not same.empty else pool
+
+    def _sort_best_match(pool):
+        if pool.empty:
+            return pool
+        return pool.sort_values(by=["delta_e", "price_num"], ascending=[True, True])
 
     # =========================================================
     # 1. TOP RECOMMENDATION: Delta E terbaik, tanpa melihat harga
     # =========================================================
-    top1_pool = exact_mst.sort_values("delta_e")
+    top1_pool = _sort_best_match(exact_mst)
     if top1_pool.empty:
-        top1_pool = primary_pool.sort_values("delta_e")
+        top1_pool = _sort_best_match(primary_pool)
     if top1_pool.empty:
-        top1_pool = df.sort_values("delta_e")
+        top1_pool = _sort_best_match(df)
 
     if not top1_pool.empty:
         _add_row(top1_pool.iloc[0])
 
+    preferred_undertone = ""
+    if selected_rows:
+        preferred_undertone = str(selected_rows[0].get("undertone_norm", "")).strip().lower()
+
     # =========================================================
-    # 2. Nomor 2: match terbaik berikutnya, harga diusahakan <= nomor 1
+    # 2. Nomor 2: match terbaik berikutnya, usahakan undertone sama,
+    #    dan jika memungkinkan harga <= nomor 1
     # =========================================================
     if len(selected_rows) < top_n:
         prev_price = selected_rows[-1].get("price_num", np.nan) if selected_rows else np.nan
         top2_pool = _available(primary_pool)
+        top2_pool = _prefer_same_undertone(top2_pool, preferred_undertone)
         top2_pool = _filter_not_more_expensive(top2_pool, prev_price)
-        top2_pool = top2_pool.sort_values("delta_e")
+        top2_pool = _sort_best_match(top2_pool)
 
         if top2_pool.empty:
             top2_pool = _available(df)
+            top2_pool = _prefer_same_undertone(top2_pool, preferred_undertone)
             top2_pool = _filter_not_more_expensive(top2_pool, prev_price)
-            top2_pool = top2_pool.sort_values("delta_e")
+            top2_pool = _sort_best_match(top2_pool)
 
         if not top2_pool.empty:
             _add_row(top2_pool.iloc[0])
 
-    # Brand nomor 1 dan 2 dibuat sebagai brand yang dihindari untuk nomor 3-5
+    # Brand nomor 1 dan 2 dihindari untuk rekomendasi nomor 3-5
     top_brands = {
         str(row.get("brand_norm", "")).strip().lower()
         for row in selected_rows[:2]
     }
 
-    def _pick_diverse_by_price(pool, prev_price):
+    def _pick_diverse_by_price(pool, prev_price, preferred_undertone=""):
         pool = _available(pool)
         if pool.empty:
             return None
 
-        # Untuk nomor 3-5, prioritaskan brand selain brand nomor 1 dan 2
+        # Untuk nomor 3-5, hindari brand yang sudah muncul pada nomor 1 dan 2
         pool = pool[~pool["brand_norm"].isin(top_brands)].copy()
         if pool.empty:
             return None
 
+        pool = _prefer_same_undertone(pool, preferred_undertone)
         pool = _filter_not_more_expensive(pool, prev_price)
         pool["price_sort"] = pool["price_num"].fillna(-1)
 
-        # Sesuai request: urutkan harga termahal ke termurah,
-        # lalu jika harga sama, pilih yang Delta E lebih kecil.
-        pool = pool.sort_values(
-            by=["price_sort", "delta_e"],
-            ascending=[False, True]
-        )
-
-        if pool.empty:
-            return None
-        return pool.iloc[0]
+        # Untuk rekomendasi 3-5: harga besar ke kecil, lalu Delta E kecil ke besar
+        pool = pool.sort_values(by=["price_sort", "delta_e"], ascending=[False, True])
+        return None if pool.empty else pool.iloc[0]
 
     # =========================================================
-    # 3. Nomor 3-5: brand berbeda, MST exact dulu, lalu sekitar, lalu luar
+    # 3. Nomor 3-5: undertone sama diusahakan, brand berbeda,
+    #    exact MST -> around MST -> outside MST
     # =========================================================
     while len(selected_rows) < top_n:
         prev_price = selected_rows[-1].get("price_num", np.nan) if selected_rows else np.nan
 
-        picked = _pick_diverse_by_price(exact_mst, prev_price)
+        picked = _pick_diverse_by_price(exact_mst, prev_price, preferred_undertone)
         if picked is None:
-            picked = _pick_diverse_by_price(around_mst, prev_price)
+            picked = _pick_diverse_by_price(around_mst, prev_price, preferred_undertone)
         if picked is None:
-            picked = _pick_diverse_by_price(outside_mst, prev_price)
+            picked = _pick_diverse_by_price(outside_mst, prev_price, preferred_undertone)
+
+        # Jika undertone yang sama benar-benar tidak tersedia, longgarkan undertone
+        if picked is None:
+            picked = _pick_diverse_by_price(exact_mst, prev_price, preferred_undertone="")
+        if picked is None:
+            picked = _pick_diverse_by_price(around_mst, prev_price, preferred_undertone="")
+        if picked is None:
+            picked = _pick_diverse_by_price(outside_mst, prev_price, preferred_undertone="")
 
         if picked is None:
             break
@@ -535,21 +532,17 @@ def recommend_foundation(mst_pred, L, a, b, df_found, top_n=5):
         _add_row(picked)
 
     # =========================================================
-    # Fallback: jika brand berbeda tidak cukup, isi dengan kandidat terbaik tersisa
+    # Fallback: jika kandidat tidak cukup, isi dengan kandidat terbaik tersisa
     # =========================================================
     while len(selected_rows) < top_n:
         prev_price = selected_rows[-1].get("price_num", np.nan) if selected_rows else np.nan
         fallback_pool = _available(df)
-
         if fallback_pool.empty:
             break
 
+        fallback_pool = _prefer_same_undertone(fallback_pool, preferred_undertone)
         fallback_pool = _filter_not_more_expensive(fallback_pool, prev_price)
-        fallback_pool = fallback_pool.sort_values(
-            by=["delta_e", "price_num"],
-            ascending=[True, False]
-        )
-
+        fallback_pool = fallback_pool.sort_values(by=["delta_e", "price_num"], ascending=[True, False])
         if fallback_pool.empty:
             break
 
@@ -557,8 +550,7 @@ def recommend_foundation(mst_pred, L, a, b, df_found, top_n=5):
 
     result = pd.DataFrame(selected_rows).head(top_n).reset_index(drop=True)
 
-    # Hapus kolom bantu agar tidak muncul di tampilan/report
-    helper_cols = ["price_num", "brand_norm", "price_sort"]
+    helper_cols = ["price_num", "brand_norm", "undertone_norm", "price_sort"]
     result = result.drop(columns=[c for c in helper_cols if c in result.columns], errors="ignore")
 
     return result
@@ -1093,16 +1085,16 @@ def create_analysis_report(result, dark_mode=True):
         product_muted = "#8A7682"
         footer_muted = "#A18897"
 
-    font_title = _load_font(42, bold=True)
-    font_sub = _load_font(20)
-    font_h2 = _load_font(28, bold=True)
-    font_label = _load_font(18, bold=True)
+    font_title = _load_font(34, bold=True)
+    font_sub = _load_font(32, bold=True)
+    font_h2 = _load_font(32, bold=True)
+    font_label = _load_font(30, bold=True)
     font_text = _load_font(20)
     font_small = _load_font(16)
     font_tiny = _load_font(14)
     font_mst = _load_font(17, bold=True)
     font_conf = _load_font(14, bold=True)
-    font_lab_title = _load_font(18, bold=True)
+    font_lab_title = _load_font(30, bold=True)
     font_lab_label = _load_font(15, bold=True)
     font_lab_value = _load_font(15, bold=True)
     font_hex = _load_font(20, bold=True)
@@ -1141,7 +1133,7 @@ def create_analysis_report(result, dark_mode=True):
     _draw_card(draw, (margin, header_y1, W - margin, header_y2), fill=card_fill, outline=border, radius=28)
     _paste_logo_or_fallback(img, draw, 76, 68, size=54)
     draw.text((145, 62), "ShadeMate", font=font_title, fill=text_dark)
-    draw.text((145, 112), "Foundation Shade Detector • Analysis Report", font=font_sub, fill=text_muted)
+    draw.text((145, 112), "Foundation Shade Detector Analysis Report", font=font_sub, fill=text_muted)
     timestamp = datetime.now().strftime("%d %B %Y • %H:%M")
     tw = draw.textbbox((0, 0), timestamp, font=font_small)[2]
     draw.text((W - margin - 40 - tw, 70), timestamp, font=font_small, fill=text_muted)
@@ -1247,7 +1239,7 @@ def create_analysis_report(result, dark_mode=True):
 
     # Main recommendation with larger text and product image on the right
     lx1, ly1, lx2, ly2 = left_bottom
-    draw.text((lx1 + 28, ly1 + 24), "Main Recommendation", font=font_h2, fill=text_dark)
+    draw.text((lx1 + 28, ly1 + 24), "Top Recommendation", font=font_h2, fill=text_dark)
     draw.line((lx1 + 28, ly1 + 72, lx2 - 28, ly1 + 72), fill=line, width=2)
 
     image_box_w, image_box_h = 190, 240
