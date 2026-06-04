@@ -463,17 +463,32 @@ def recommend_foundation(mst_pred, L, a, b, df_found, top_n=5):
 
     # =========================================================
     # 2. Nomor 2: match terbaik berikutnya, usahakan undertone sama,
-    #    dan jika memungkinkan harga <= nomor 1
+    #    brand HARUS berbeda dari nomor 1, dan jika memungkinkan harga <= nomor 1
     # =========================================================
     if len(selected_rows) < top_n:
         prev_price = selected_rows[-1].get("price_num", np.nan) if selected_rows else np.nan
+        top1_brand = (
+            str(selected_rows[0].get("brand_norm", "")).strip().lower()
+            if selected_rows else ""
+        )
+
         top2_pool = _available(primary_pool)
+
+        # Brand nomor 2 tidak boleh sama dengan brand nomor 1
+        if top1_brand:
+            top2_pool = top2_pool[top2_pool["brand_norm"] != top1_brand].copy()
+
         top2_pool = _prefer_same_undertone(top2_pool, preferred_undertone)
         top2_pool = _filter_not_more_expensive(top2_pool, prev_price)
         top2_pool = _sort_best_match(top2_pool)
 
         if top2_pool.empty:
             top2_pool = _available(df)
+
+            # Tetap paksa brand nomor 2 berbeda dari brand nomor 1
+            if top1_brand:
+                top2_pool = top2_pool[top2_pool["brand_norm"] != top1_brand].copy()
+
             top2_pool = _prefer_same_undertone(top2_pool, preferred_undertone)
             top2_pool = _filter_not_more_expensive(top2_pool, prev_price)
             top2_pool = _sort_best_match(top2_pool)
