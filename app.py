@@ -341,17 +341,227 @@ def predict_mst_hybrid(feats, ensemble, scaler, kmeans, centroids, feature_cols,
 # ─────────────────────────────────────────────
 # REKOMENDASI
 # ─────────────────────────────────────────────
-def recommend_foundation(mst_pred, L, a, b, df_found, top_n=6):
+def recommend_foundation(mst_pred, L, a, b, df_found, top_n=5):
+    """
+    Rekomendasi foundation dengan aturan:
+    1. Nomor 1 / Main Recommendation:
+       - Tetap berdasarkan kecocokan warna terbaik, yaitu Delta E terkecil.
+       - Tidak mempertimbangkan harga.
+       - Prioritas MST pengguna, lalu MST sekitar, lalu seluruh data.
+
+    2. Nomor 2:
+       - Masih berdasarkan kecocokan warna terbaik berikutnya.
+       - Brand boleh sama atau berbeda.
+       - Jika memungkinkan, harga tidak lebih mahal dari nomor 1.
+
+    3. Nomor 3 sampai 5:
+       - Mengutamakan brand selain brand yang muncul di nomor 1 dan 2.
+       - Tetap mencari dari MST pengguna terlebih dahulu.
+       - Jika tidak cukup, baru mengambil dari MST sekitar pengguna.
+       - Jika masih tidak cukup, baru mengambil dari luar MST sekitar.
+       - Diurutkan berdasarkan harga dari termahal ke termurah.
+       - Harga rekomendasi berikutnya diusahakan tidak lebih mahal dari nomor sebelumnya.
+    """
     df = df_found.copy()
-    df['delta_e'] = np.sqrt(
-        (df['lab_L'] - L)**2 +
-        (df['lab_a'] - a)**2 +
-        (df['lab_b'] - b)**2
+
+    try:
+        mst_pred = int(mst_pred)
+    except Exception:
+        mst_pred = 5
+
+    # Hitung Delta E / jarak warna CIELAB antara shade foundation dan warna kulit user
+    df["delta_e"] = np.sqrt(
+        (df["lab_L"] - L) ** 2 +
+        (df["lab_a"] - a) ** 2 +
+        (df["lab_b"] - b) ** 2
     )
-    mst_range  = [mst_pred - 1, mst_pred, mst_pred + 1]
-    df_primary = df[df['mst_id'].isin(mst_range)].sort_values('delta_e')
-    df_fallback= df[~df['mst_id'].isin(mst_range)].sort_values('delta_e')
-    return pd.concat([df_primary, df_fallback]).head(top_n).reset_index(drop=True)
+
+    # Ubah harga menjadi angka agar bisa diurutkan dan dibandingkan
+    def _price_num(value):
+        try:
+            if pd.isna(value):
+                return np.nan
+
+            # Kalau sudah numerik, langsung pakai
+            if isinstance(value, (int, float, np.integer, np.floating)):
+                return float(value)
+
+            s = str(value).lower().strip()
+            s = s.replace("rp", "").replace("idr", "").strip()
+            s = s.replace(",00", "")
+            s = s.replace(".", "").replace(",", "")
+            digits = "".join(ch for ch in s if ch.isdigit())
+
+            if digits == "":
+                return np.nan
+
+            return float(digits)
+        except Exception:
+            return np.nan
+
+    df["price_num"] = df["Price"].apply(_price_num)
+    df["brand_norm"] = df["Brand"].astype(str).str.strip().str.lower()
+
+    # Hindari shade duplikat persis
+    subset_cols = [c for c in ["Brand", "Product", "Shade"] if c in df.columns]
+    if subset_cols:
+        df = df.drop_duplicates(subset=subset_cols, keep="first")
+
+    # Prioritas MST
+    exact_mst = df[df["mst_id"] == mst_pred].copy()
+    around_mst = df[
+        (df["mst_id"].isin([mst_pred - 1, mst_pred + 1])) &
+        (df["mst_id"] != mst_pred)
+    ].copy()
+    outside_mst = df[
+        ~df["mst_id"].isin([mst_pred - 1, mst_pred, mst_pred + 1])
+    ].copy()
+    primary_pool = pd.concat([exact_mst, around_mst], ignore_index=True)
+
+    selected_rows = []
+    selected_keys = set()
+
+    def _row_key(row):
+        return (
+            str(row.get("Brand", "")).strip().lower(),
+            str(row.get("Product", "")).strip().lower(),
+            str(row.get("Shade", "")).strip().lower(),
+        )
+
+    def _add_row(row):
+        key = _row_key(row)
+        if key in selected_keys:
+            return False
+        selected_rows.append(row)
+        selected_keys.add(key)
+        return True
+
+    def _available(data):
+        if data is None or len(data) == 0:
+            return pd.DataFrame()
+        data = data.copy()
+        if not selected_keys:
+            return data
+        return data[~data.apply(lambda r: _row_key(r) in selected_keys, axis=1)]
+
+    def _filter_not_more_expensive(pool, prev_price):
+        """Usahakan harga tidak naik dari rekomendasi sebelumnya."""
+        if pool.empty or pd.isna(prev_price):
+            return pool
+
+        price_safe = pool[
+            (pool["price_num"].isna()) |
+            (pool["price_num"] <= prev_price)
+        ].copy()
+
+        # Kalau ada kandidat yang memenuhi aturan harga, gunakan itu.
+        # Kalau tidak ada, kembalikan pool awal supaya rekomendasi tetap tidak kosong.
+        return price_safe if not price_safe.empty else pool
+
+    # =========================================================
+    # 1. TOP RECOMMENDATION: Delta E terbaik, tanpa melihat harga
+    # =========================================================
+    top1_pool = exact_mst.sort_values("delta_e")
+    if top1_pool.empty:
+        top1_pool = primary_pool.sort_values("delta_e")
+    if top1_pool.empty:
+        top1_pool = df.sort_values("delta_e")
+
+    if not top1_pool.empty:
+        _add_row(top1_pool.iloc[0])
+
+    # =========================================================
+    # 2. Nomor 2: match terbaik berikutnya, harga diusahakan <= nomor 1
+    # =========================================================
+    if len(selected_rows) < top_n:
+        prev_price = selected_rows[-1].get("price_num", np.nan) if selected_rows else np.nan
+        top2_pool = _available(primary_pool)
+        top2_pool = _filter_not_more_expensive(top2_pool, prev_price)
+        top2_pool = top2_pool.sort_values("delta_e")
+
+        if top2_pool.empty:
+            top2_pool = _available(df)
+            top2_pool = _filter_not_more_expensive(top2_pool, prev_price)
+            top2_pool = top2_pool.sort_values("delta_e")
+
+        if not top2_pool.empty:
+            _add_row(top2_pool.iloc[0])
+
+    # Brand nomor 1 dan 2 dibuat sebagai brand yang dihindari untuk nomor 3-5
+    top_brands = {
+        str(row.get("brand_norm", "")).strip().lower()
+        for row in selected_rows[:2]
+    }
+
+    def _pick_diverse_by_price(pool, prev_price):
+        pool = _available(pool)
+        if pool.empty:
+            return None
+
+        # Untuk nomor 3-5, prioritaskan brand selain brand nomor 1 dan 2
+        pool = pool[~pool["brand_norm"].isin(top_brands)].copy()
+        if pool.empty:
+            return None
+
+        pool = _filter_not_more_expensive(pool, prev_price)
+        pool["price_sort"] = pool["price_num"].fillna(-1)
+
+        # Sesuai request: urutkan harga termahal ke termurah,
+        # lalu jika harga sama, pilih yang Delta E lebih kecil.
+        pool = pool.sort_values(
+            by=["price_sort", "delta_e"],
+            ascending=[False, True]
+        )
+
+        if pool.empty:
+            return None
+        return pool.iloc[0]
+
+    # =========================================================
+    # 3. Nomor 3-5: brand berbeda, MST exact dulu, lalu sekitar, lalu luar
+    # =========================================================
+    while len(selected_rows) < top_n:
+        prev_price = selected_rows[-1].get("price_num", np.nan) if selected_rows else np.nan
+
+        picked = _pick_diverse_by_price(exact_mst, prev_price)
+        if picked is None:
+            picked = _pick_diverse_by_price(around_mst, prev_price)
+        if picked is None:
+            picked = _pick_diverse_by_price(outside_mst, prev_price)
+
+        if picked is None:
+            break
+
+        _add_row(picked)
+
+    # =========================================================
+    # Fallback: jika brand berbeda tidak cukup, isi dengan kandidat terbaik tersisa
+    # =========================================================
+    while len(selected_rows) < top_n:
+        prev_price = selected_rows[-1].get("price_num", np.nan) if selected_rows else np.nan
+        fallback_pool = _available(df)
+
+        if fallback_pool.empty:
+            break
+
+        fallback_pool = _filter_not_more_expensive(fallback_pool, prev_price)
+        fallback_pool = fallback_pool.sort_values(
+            by=["delta_e", "price_num"],
+            ascending=[True, False]
+        )
+
+        if fallback_pool.empty:
+            break
+
+        _add_row(fallback_pool.iloc[0])
+
+    result = pd.DataFrame(selected_rows).head(top_n).reset_index(drop=True)
+
+    # Hapus kolom bantu agar tidak muncul di tampilan/report
+    helper_cols = ["price_num", "brand_norm", "price_sort"]
+    result = result.drop(columns=[c for c in helper_cols if c in result.columns], errors="ignore")
+
+    return result
 
 
 # ─────────────────────────────────────────────
